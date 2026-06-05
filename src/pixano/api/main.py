@@ -27,13 +27,14 @@ def create_app(settings: Settings = Settings()) -> FastAPI:
     # Create app
     app = FastAPI(title="Pixano", version=__version__, default_response_class=ORJSONResponse)
     app.add_middleware(GZipMiddleware, minimum_size=500)
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origins=["*"],
-        allow_credentials=False,
-        allow_methods=["*"],
-        allow_headers=["*"],
-    )
+    if settings.cors_origins:
+        app.add_middleware(
+            CORSMiddleware,
+            allow_origins=settings.cors_origins,
+            allow_credentials=False,
+            allow_methods=["*"],
+            allow_headers=["*"],
+        )
 
     # Mount models folder
     if settings.models_dir is None:
