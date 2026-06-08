@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 import json
+import logging
 from pathlib import Path
 from typing import Literal, overload
 
@@ -45,6 +46,9 @@ from pixano.schemas import (
     validate_canonical_table_map,
 )
 from pixano.schemas.schema_group import SchemaGroup, schema_to_group
+
+
+logger = logging.getLogger(__name__)
 
 
 _DATASET_INFO_SLOT_TYPES: dict[str, type[LanceModel]] = {
@@ -269,10 +273,16 @@ class DatasetInfo(BaseModel):
             if schema_payload is not None:
                 info_json[slot_name] = _deserialize_table_schema(schema_payload)
         views_json = info_json.get("views", {})
-        info_json["views"] = {
-            logical_name: _deserialize_table_schema(schema_payload)
-            for logical_name, schema_payload in views_json.items()
-        }
+        deserialized_views: dict[str, type[LanceModel]] = {}
+        for logical_name, schema_payload in views_json.items():
+            try:
+                deserialized_views[logical_name] = _deserialize_table_schema(schema_payload)
+            except Exception as e:
+                # Drop views whose schema cannot be deserialized (e.g. it references a base schema
+                # not registered in this build) so the rest of the dataset stays usable instead of
+                # making every endpoint that loads this dataset fail.
+                logger.warning("Dropping view '%s' from %s with unsupported schema: %s", logical_name, json_fp, e)
+        info_json["views"] = deserialized_views
 
         info = DatasetInfo.model_validate(info_json)
         return info
@@ -311,7 +321,14 @@ class DatasetInfo(BaseModel):
 
         # Browse directory
         for json_fp in sorted(directory.glob("*/info.json")):
-            info: DatasetInfo = DatasetInfo.from_json(json_fp)
+            try:
+                info: DatasetInfo = DatasetInfo.from_json(json_fp)
+            except Exception as e:
+                # Skip datasets whose stored schema cannot be deserialized (e.g. it references a
+                # base schema not registered in this build) so one bad dataset does not break the
+                # whole library listing.
+                logger.warning("Failed to load dataset info from %s, skipping: %s", json_fp, e)
+                continue
             try:
                 preview_path = json_fp.parent.resolve() / "previews/dataset_preview.jpg"
                 if not preview_path.exists():

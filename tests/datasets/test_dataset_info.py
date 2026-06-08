@@ -5,6 +5,7 @@
 # =====================================
 
 
+import json
 import tempfile
 from pathlib import Path
 
@@ -225,6 +226,70 @@ class TestDatasetInfo:
         temp_dir = Path(tempfile.TemporaryDirectory().name)
         with pytest.raises(FileNotFoundError):
             DatasetInfo.load_directory(temp_dir)
+
+    def test_load_directory_skips_unloadable(self):
+        # A dataset whose stored schema references a base schema not registered in this build
+        # (e.g. unfinished work on another branch) must not break loading of the other datasets.
+        temp_dir = Path(tempfile.TemporaryDirectory().name)
+
+        valid_dir = temp_dir / "valid"
+        valid_dir.mkdir(parents=True, exist_ok=False)
+        DatasetInfo(
+            id="valid_id",
+            name="valid",
+            description="valid dataset",
+            size="8GB",
+            preview="/preview",
+            workspace=WorkspaceType.IMAGE,
+            record=Record,
+            entity=Entity,
+            bbox=BBox,
+            views={"image": Image},
+        ).to_json(valid_dir / "info.json")
+
+        # Reuse the valid serialization and only corrupt the record schema's base.
+        broken_dir = temp_dir / "broken"
+        broken_dir.mkdir(parents=True, exist_ok=False)
+        broken_payload = json.loads((valid_dir / "info.json").read_text(encoding="utf-8"))
+        broken_payload["id"] = "broken_id"
+        broken_payload["name"] = "broken"
+        broken_payload["record"] = {"base": "TimeSeries", "fields": {}}
+        (broken_dir / "info.json").write_text(json.dumps(broken_payload, indent=4), encoding="utf-8")
+
+        library = DatasetInfo.load_directory(temp_dir)
+
+        assert len(library) == 1
+        assert library[0].id == "valid_id"
+
+    def test_from_json_drops_unsupported_view(self):
+        # A view whose stored schema references a base not registered in this build (e.g.
+        # unfinished schema work on another branch) must be dropped, leaving the rest of the
+        # dataset loadable instead of failing every endpoint that opens it.
+        temp_dir = Path(tempfile.TemporaryDirectory().name)
+        temp_dir.mkdir(parents=True, exist_ok=False)
+        info_fp = temp_dir / "info.json"
+
+        DatasetInfo(
+            id="ds_id",
+            name="ds",
+            description="dataset with an unsupported view",
+            size="8GB",
+            preview="/preview",
+            workspace=WorkspaceType.IMAGE,
+            record=Record,
+            entity=Entity,
+            bbox=BBox,
+            views={"image": Image},
+        ).to_json(info_fp)
+
+        payload = json.loads(info_fp.read_text(encoding="utf-8"))
+        payload["views"]["timeseries"] = {"base": "TimeSeries", "fields": {}}
+        info_fp.write_text(json.dumps(payload, indent=4), encoding="utf-8")
+
+        info = DatasetInfo.from_json(info_fp)
+
+        assert "image" in info.views
+        assert "timeseries" not in info.views
 
     def test_load_id(self):
         temp_dir = Path(tempfile.TemporaryDirectory().name)
