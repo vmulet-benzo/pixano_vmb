@@ -13,12 +13,11 @@ License: CECILL-C
     BBox3DGeometry,
     LocalBBox3DAnnotation,
   } from "$lib/annotations/annotationCollection.svelte.js";
+  import { DEFAULT_3D_ROTATION, generateShortId } from "$lib/annotations/buildPayloads.js";
   import {
-    buildBBox3DCreate,
-    buildBBox3DUpdate,
-    DEFAULT_3D_ROTATION,
-    generateShortId,
-  } from "$lib/annotations/buildPayloads.js";
+    BBOX3D_RESOURCE,
+    bbox3dPayloadBuilder,
+  } from "$lib/annotations/kinds/3d/bbox3d/bbox3dPayloadBuilder.js";
   import { DEFAULT_TOOL_3D, TOOLS_3D } from "$lib/annotations/tools/registry3d.js";
   import type { PointCloudWidgetStorage } from "$lib/annotations/types.js";
   import type { LocalBBox3D } from "$lib/api/annotations.js";
@@ -127,23 +126,23 @@ License: CECILL-C
     const annotation = storage.annotations.find(boxId);
     if (!annotation) return;
 
+    const geometry: BBox3DGeometry = { coords, format: "xyzwhd", rotation };
+    storage.annotations.setGeometry(boxId, geometry);
+
     if (annotation.persisted) {
-      const updateBody = buildBBox3DUpdate(
+      const updateBody = bbox3dPayloadBuilder.buildUpdate(
         { datasetId, recordId, viewId },
-        boxId,
-        annotation.entityId,
-        coords,
-        rotation,
+        annotation as LocalBBox3DAnnotation,
       );
       const pending = manager.pendingMutations.find(
-        (m) => m.op === "update" && m.resource === "bbox3ds" && m.id === boxId,
+        (m) => m.op === "update" && m.resource === BBOX3D_RESOURCE && m.id === boxId,
       );
       if (pending && pending.op === "update") {
         pending.body = updateBody;
       } else {
         manager.queueMutation({
           op: "update",
-          resource: "bbox3ds",
+          resource: BBOX3D_RESOURCE,
           id: boxId,
           body: updateBody,
           widgetId: stableWidgetId,
@@ -154,7 +153,7 @@ License: CECILL-C
       const pending = manager.pendingMutations.find(
         (m) =>
           m.op === "create" &&
-          m.resource === "bbox3ds" &&
+          m.resource === BBOX3D_RESOURCE &&
           m.widgetId === stableWidgetId &&
           m.localAnnotationId === boxId,
       );
@@ -163,29 +162,21 @@ License: CECILL-C
         pending.body.rotation = rotation ?? DEFAULT_3D_ROTATION;
       }
     }
-    const geometry: BBox3DGeometry = { coords, format: "xyzwhd", rotation };
-    storage.annotations.setGeometry(boxId, geometry);
   }
 
   function handleNewBoxSave(
     coords: [number, number, number, number, number, number],
     rotation: number[] | undefined,
   ): void {
-    const localId = generateShortId();
-    const { entityId, mutations } = buildBBox3DCreate(
-      { datasetId, recordId, viewId },
-      coords,
-      { widgetId: stableWidgetId, localAnnotationId: localId, rotation },
-    );
     const draft: LocalBBox3DAnnotation = {
-      id: localId,
-      entityId,
+      id: generateShortId(),
+      entityId: generateShortId(),
       kind: "bbox3d",
       geometry: { coords, format: "xyzwhd", rotation },
       persisted: false,
     };
     storage.annotations.add(draft);
-    for (const m of mutations) {
+    for (const m of bbox3dPayloadBuilder.buildCreate({ datasetId, recordId, viewId }, draft, stableWidgetId)) {
       manager.queueMutation(m);
     }
   }

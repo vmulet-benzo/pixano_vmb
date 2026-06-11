@@ -8,15 +8,21 @@ import Konva from "konva";
 import { Square } from "lucide-svelte";
 
 import type { LocalBBox } from "$lib/annotations/annotationCollection.svelte.js";
-import { buildBBoxCreate, generateShortId } from "$lib/annotations/buildPayloads.js";
-import type { Scene2DContext, Tool2D, ToolHandler2D } from "$lib/annotations/tools/types2d.js";
-import type { ResourceMutation } from "$lib/annotations/types.js";
+import { generateShortId } from "$lib/annotations/buildPayloads.js";
 import {
   BBOX_COLOR_DRAFT,
   getPixelFrame,
   PIXEL_THRESHOLD,
   pixelToNormalized,
-} from "$lib/components/widgets/image/imageWidgetGeometry.js";
+} from "$lib/annotations/tools/scene2dGeometry.js";
+import {
+  DEFAULT_TOOL_2D,
+  type Scene2DContext,
+  type Tool2D,
+  type ToolHandler2D,
+} from "$lib/annotations/tools/types2d.js";
+
+import { bboxPayloadBuilder } from "./bboxPayloadBuilder.js";
 
 /**
  * Rubber-band bbox drawing. Pointer down anchors a corner, move stretches
@@ -72,13 +78,13 @@ class DrawBBoxHandler implements ToolHandler2D {
     this._destroyDraft();
 
     if (width < PIXEL_THRESHOLD || height < PIXEL_THRESHOLD) {
-      this.ctx.setActiveTool("select");
+      this.ctx.setActiveTool(DEFAULT_TOOL_2D);
       return;
     }
 
     const frame = getPixelFrame(this.ctx.getKonvaImage());
     if (!frame || frame.w <= 0 || frame.h <= 0) {
-      this.ctx.setActiveTool("select");
+      this.ctx.setActiveTool(DEFAULT_TOOL_2D);
       return;
     }
 
@@ -88,37 +94,34 @@ class DrawBBoxHandler implements ToolHandler2D {
     const clampedH = Math.min(frame.y + frame.h, rectY + height) - clampedTop;
 
     if (clampedW < PIXEL_THRESHOLD || clampedH < PIXEL_THRESHOLD) {
-      this.ctx.setActiveTool("select");
+      this.ctx.setActiveTool(DEFAULT_TOOL_2D);
       return;
     }
 
     const coordsNorm = pixelToNormalized(clampedLeft, clampedTop, clampedW, clampedH, frame);
 
-    const localId = generateShortId();
-    const { entityId, bboxId, mutations } = buildBBoxCreate(this.ctx.buildContext, coordsNorm, {
-      widgetId: this.ctx.widgetId,
-      localAnnotationId: localId,
-    });
-
-    const bbox: LocalBBox = { id: localId, entityId, kind: "bbox", geometry: coordsNorm, persisted: false };
+    const bbox: LocalBBox = {
+      id: generateShortId(),
+      entityId: generateShortId(),
+      kind: "bbox",
+      geometry: coordsNorm,
+      persisted: false,
+    };
     this.ctx.collection.add(bbox);
 
-    for (const m of mutations) {
-      if (m.op === "create" && m.resource === "bboxes") {
-        (m as ResourceMutation & { body: Record<string, unknown> }).body.id = bboxId;
-      }
+    for (const m of bboxPayloadBuilder.buildCreate(this.ctx.buildContext, bbox, this.ctx.widgetId)) {
       this.ctx.mutations.queue(m);
     }
 
-    this.ctx.setActiveTool("select");
-    this.ctx.collection.select(localId);
+    this.ctx.setActiveTool(DEFAULT_TOOL_2D);
+    this.ctx.collection.select(bbox.id);
     this.ctx.requestRedraw();
   }
 
   onKeyDown(event: KeyboardEvent): boolean {
     if (event.key === "Escape") {
       this._destroyDraft();
-      this.ctx.setActiveTool("select");
+      this.ctx.setActiveTool(DEFAULT_TOOL_2D);
       return true;
     }
     return false;
