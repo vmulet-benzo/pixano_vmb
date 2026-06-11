@@ -145,7 +145,7 @@ License: CECILL-C
         id: boxId,
         body: updateBody,
         widgetId: stableWidgetId,
-        localBBoxId: boxId,
+        localAnnotationId: boxId,
       });
     }
     const draftIdx = storage.drafts.findIndex((d) => d.id === boxId);
@@ -164,7 +164,7 @@ License: CECILL-C
     const { entityId, mutations } = buildBBox3DCreate(
       { datasetId, recordId, viewId },
       coords,
-      { widgetId: stableWidgetId, localBBoxId: localId, rotation },
+      { widgetId: stableWidgetId, localAnnotationId: localId, rotation },
     );
     const draft: DraftBBox3D = {
       id: localId,

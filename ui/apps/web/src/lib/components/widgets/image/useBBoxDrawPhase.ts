@@ -116,7 +116,7 @@ export class BBoxDrawPhase {
         viewId: this.imgOptions.viewId,
       },
       coordsNorm,
-      { widgetId: this.widgetId, localBBoxId: localId },
+      { widgetId: this.widgetId, localAnnotationId: localId },
     );
     void entityId;
 

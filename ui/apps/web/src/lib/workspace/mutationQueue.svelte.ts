@@ -13,7 +13,7 @@ import type { MutationGateway } from "./datasetGateway.js";
 import type { WorkspaceSession } from "./workspaceSession.svelte.js";
 
 /**
- * Lookup the queue uses to mark a `LocalBBox` as persisted after a
+ * Lookup the queue uses to mark a local annotation as persisted after a
  * successful create. The queue stays widget-storage-agnostic; the wiring
  * code that constructs the queue supplies a closure that knows where to
  * look.
@@ -22,10 +22,10 @@ import type { WorkspaceSession } from "./workspaceSession.svelte.js";
  * cleared (e.g. user navigated away mid-flush) and the persistence flag
  * doesn't need flipping.
  */
-export interface LocalBBoxLocator {
-  findLocalBBox(
+export interface LocalAnnotationLocator {
+  findLocalAnnotation(
     widgetId: string,
-    localBBoxId: string,
+    localAnnotationId: string,
   ): { persisted: boolean } | undefined;
 }
 
@@ -45,7 +45,7 @@ export class MutationQueue {
   constructor(
     private gateway: MutationGateway,
     private session: WorkspaceSession,
-    private locator: LocalBBoxLocator,
+    private locator: LocalAnnotationLocator,
   ) {}
 
   /** Append a mutation to the queue. Order matters; `flush` re-orders only
@@ -60,10 +60,10 @@ export class MutationQueue {
    * Used when a bbox is deleted locally before it has been persisted, so
    * we don't POST-then-DELETE it for nothing.
    */
-  dropForLocalBBox(localBBoxId: string): ResourceMutation[] {
+  dropForLocalAnnotation(localAnnotationId: string): ResourceMutation[] {
     const dropped: ResourceMutation[] = [];
     this.pending = this.pending.filter((m) => {
-      if (m.localBBoxId === localBBoxId) {
+      if (m.localAnnotationId === localAnnotationId) {
         dropped.push(m);
         return false;
       }
@@ -80,8 +80,8 @@ export class MutationQueue {
 
   /**
    * Flush every queued mutation to the backend. Entities are created
-   * before the bboxes that reference them; deletes run last. On success,
-   * the corresponding `LocalBBox` (if any) is marked `persisted: true`
+   * before the annotations that reference them; deletes run last. On success,
+   * the corresponding local annotation (if any) is marked `persisted: true`
    * via the locator the manager provided.
    */
   async flush(): Promise<void> {
@@ -110,11 +110,11 @@ export class MutationQueue {
           mutation.op === "create" &&
           mutation.resource !== ENTITY_RESOURCE &&
           mutation.widgetId &&
-          mutation.localBBoxId
+          mutation.localAnnotationId
         ) {
-          const bbox = this.locator.findLocalBBox(
+          const bbox = this.locator.findLocalAnnotation(
             mutation.widgetId,
-            mutation.localBBoxId,
+            mutation.localAnnotationId,
           );
           if (bbox) bbox.persisted = true;
         }

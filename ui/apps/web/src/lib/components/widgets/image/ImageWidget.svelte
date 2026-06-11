@@ -215,8 +215,8 @@ License: CECILL-C
   const widgetPending = $derived(
     new Set(
       manager.pendingMutations
-        .filter((m) => m.widgetId === stableWidgetId && m.localBBoxId)
-        .map((m) => m.localBBoxId as string),
+        .filter((m) => m.widgetId === stableWidgetId && m.localAnnotationId)
+        .map((m) => m.localAnnotationId as string),
     ).size,
   );
 </script>
