@@ -16,15 +16,17 @@ License: CECILL-C
   import type { LocalBBox3D } from "$lib/api/annotations";
   import type { OrbitControls as ThreeOrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 
-  import { RING_DEFS } from "./boxEditorConstants.js";
+  import type { BBoxRenderData, GizmoVisibility } from "$lib/annotations/kinds/3d/bbox3d/bbox3dTypes.js";
+  import { BoxEditor } from "$lib/annotations/kinds/3d/bbox3d/boxEditor.svelte.js";
+  import { RING_DEFS } from "$lib/annotations/kinds/3d/bbox3d/boxEditorConstants.js";
+  import { drawBBox3DTool } from "$lib/annotations/kinds/3d/bbox3d/drawBBox3DTool.js";
   import { PointCloudCamera } from "./usePointCloudCamera.svelte.js";
-  import { BoxEditor } from "./useBoxEditor.svelte.js";
-  import type { BBoxRenderData, GizmoVisibility } from "./pointCloudTypes.js";
 
   interface Props {
     pointCloudUrl?: string;
     bboxes3d?: LocalBBox3D[];
-    drawMode?: boolean;
+    /** Active tool id from the 3D tool registry. */
+    activeToolId?: string;
     cameraMode?: "orbit" | "first-person";
     onReadyToConfirm?: (coords: [number, number, number, number, number, number], rotation?: number[], editingId?: string) => void;
     onDrawCanceled?: () => void;
@@ -35,13 +37,16 @@ License: CECILL-C
   let {
     pointCloudUrl,
     bboxes3d = [],
-    drawMode = false,
+    activeToolId = "",
     cameraMode = "orbit",
     onReadyToConfirm,
     onDrawCanceled,
     onLoadError,
     gizmoVisibility = { rings: true, resizeArrows: true, translateArrows: true },
   }: Props = $props();
+
+  // The box editor owns pointer interaction while its tool is active.
+  const drawMode = $derived(activeToolId === drawBBox3DTool.id);
 
   // ─── Rendering state ──────────────────────────────────────────────────────
   let positions = $state<Float32Array>(new Float32Array(0));

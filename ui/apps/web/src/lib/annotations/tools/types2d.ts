@@ -5,12 +5,13 @@ License: CECILL-C
 -------------------------------------*/
 
 import type Konva from "konva";
-import type { IconProps } from "lucide-svelte";
-import type { ComponentType, SvelteComponent } from "svelte";
 
-import type { AnnotationCollection, AnnotationKind } from "../annotationCollection.svelte.js";
+import type { AnnotationCollection } from "../annotationCollection.svelte.js";
 import type { BuildContext } from "../buildPayloads.js";
 import type { ResourceMutation } from "../types.js";
+import type { ToolDefinition } from "./toolDefinition.js";
+
+export type { ToolDefinition } from "./toolDefinition.js";
 
 /**
  * Id of the default (select) tool. Lives here rather than in the registry so
@@ -18,23 +19,6 @@ import type { ResourceMutation } from "../types.js";
  * tool implementations — and their Konva dependency — into their bundle.
  */
 export const DEFAULT_TOOL_2D = "select";
-
-/**
- * Metadata shared by every tool, 2D or 3D. This is the only type the two
- * scene families have in common (docs/ARCHITECTURE.md, decision D3).
- */
-export interface ToolDefinition {
-  /** Unique id, e.g. "select", "draw-bbox". */
-  id: string;
-  /** Toolbar tooltip text. */
-  label: string;
-  /** Lucide icon component rendered in the toolbar. */
-  icon: ComponentType<SvelteComponent<IconProps>>;
-  /** Annotation kind this tool produces; omitted for kind-agnostic tools. */
-  kind?: AnnotationKind;
-  /** CSS cursor applied to the canvas while the tool is active. */
-  cursor?: string;
-}
 
 /**
  * Narrow view of the mutation queue handed to tools: enough to queue work

@@ -83,7 +83,8 @@ export interface ImageWidgetStorage {
  * Mutable per-instance storage for the point-cloud widget.
  */
 export interface PointCloudWidgetStorage {
-  mode: "navigate" | "draw-bbox3d";
+  /** Id of the active tool from the 3D tool registry. */
+  activeToolId: string;
   annotations: AnnotationCollection;
   [key: string]: unknown;
 }

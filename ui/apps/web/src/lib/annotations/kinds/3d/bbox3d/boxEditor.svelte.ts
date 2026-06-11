@@ -27,7 +27,7 @@ import {
   RING_LOCAL_QUATS,
   TRANSLATE_ARROW_DEFS,
 } from "./boxEditorConstants.js";
-import type { BBoxRenderData, GizmoVisibility } from "./pointCloudTypes.js";
+import type { BBoxRenderData, GizmoVisibility } from "./bbox3dTypes.js";
 
 type DrawPhase = "idle" | "confirming" | "moving" | "resizing-face" | "rotating";
 
@@ -232,6 +232,7 @@ export class BoxEditor {
       void this.getDrawMode();
 
       const el = ref.domElement;
+      if (!el) return;
 
       const setupRay = (clientX: number, clientY: number) => {
         const rect = el.getBoundingClientRect();
