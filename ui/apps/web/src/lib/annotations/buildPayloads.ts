@@ -42,7 +42,7 @@ export interface BuildBBoxResult {
  * `"other"` as the source type so we don't imply ground-truth provenance for
  * freshly drawn boxes.
  */
-const DEFAULT_SOURCE = {
+export const DEFAULT_SOURCE = {
   source_type: "other",
   source_name: "Pixano",
   source_metadata: "{}",

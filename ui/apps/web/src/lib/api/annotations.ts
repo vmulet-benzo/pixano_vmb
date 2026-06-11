@@ -157,6 +157,43 @@ export async function listBBox3Ds(
   return res.items ?? [];
 }
 
+/**
+ * Generic annotation listing for any backend resource (e.g. "keypoints").
+ * Same query-param contract as `listBBoxes`; the caller names the row type.
+ * New annotation kinds list their rows through this instead of adding
+ * another per-resource copy.
+ */
+export async function listAnnotations<T = Record<string, unknown>>(
+  datasetId: string,
+  resource: string,
+  params: { recordId?: string; viewId?: string; limit?: number } = {},
+): Promise<T[]> {
+  const qs = new URLSearchParams();
+  if (params.recordId) qs.set("record_id", params.recordId);
+  if (params.viewId) qs.set("view_name", params.viewId);
+  qs.set("limit", String(params.limit ?? 1000));
+  const res = await requestJson<{ items: T[] }>(
+    `${resourceUrl(datasetId, resource)}?${qs.toString()}`,
+    { headers: JSON_HEADERS, method: "GET" },
+    "listAnnotations",
+  );
+  return res.items ?? [];
+}
+
+/**
+ * Minimal shape of a KeyPoints row as returned by `GET /datasets/:id/keypoints`.
+ * `coords` is a flat list of x,y pairs; one `states` entry per point.
+ */
+export interface KeyPointsRow {
+  id: string;
+  record_id: string;
+  entity_id: string;
+  view_id: string;
+  template_id: string;
+  coords: number[];
+  states: string[];
+}
+
 export function createEntity(
   datasetId: string,
   body: Record<string, unknown>,

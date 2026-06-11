@@ -44,8 +44,14 @@ export interface BBox3DGeometry {
   rotation?: number[];
 }
 
+/** Normalized [0, 1] image coordinates, one entry per keypoint. */
+export interface KeypointsGeometry {
+  points: { x: number; y: number }[];
+}
+
 export type LocalBBox = LocalAnnotation<BBoxGeometry>;
 export type LocalBBox3DAnnotation = LocalAnnotation<BBox3DGeometry>;
+export type LocalKeypoints = LocalAnnotation<KeypointsGeometry>;
 
 /**
  * Owns the local annotation list of one widget instance: membership,

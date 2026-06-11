@@ -4,7 +4,12 @@ Author : pixano@cea.fr
 License: CECILL-C
 -------------------------------------*/
 
-import { AnnotationCollection, type LocalBBox } from "$lib/annotations/annotationCollection.svelte.js";
+import {
+  AnnotationCollection,
+  type LocalBBox,
+  type LocalKeypoints,
+} from "$lib/annotations/annotationCollection.svelte.js";
+import { KEYPOINTS_RESOURCE } from "$lib/annotations/kinds/2d/keypoints/keypointsPayloadBuilder.js";
 import { DEFAULT_TOOL_2D } from "$lib/annotations/tools/types2d.js";
 import type {
   CameraCalibration,
@@ -12,7 +17,7 @@ import type {
   ImageWidgetOptions,
   ImageWidgetStorage,
 } from "$lib/annotations/types.js";
-import type { BBoxRow } from "$lib/api/annotations.js";
+import type { BBoxRow, KeyPointsRow } from "$lib/api/annotations.js";
 import type { CalibratedImageResponse } from "$lib/api/restTypes.js";
 import ImageWidget from "$lib/components/widgets/image/ImageWidget.svelte";
 
@@ -65,19 +70,22 @@ export const ImageExtension = WidgetExtension.create<ImageWidgetOptions, ImageWi
 
     const image = await gateway.loadImageByLogicalName(datasetId, recordId, viewName);
 
-    // Pre-fetch bboxes for this view. We load all record bboxes and filter
-    // client-side, matching both the image row id (new annotations) and the
-    // view logical name (legacy annotations where view_id was the camera name
-    // rather than the image row id) so existing data is always visible.
-    const allBBoxes = image
-      ? await gateway
-          .listBBoxes(datasetId, { recordId })
-          .catch(() => [] as BBoxRow[])
-      : [];
+    // Pre-fetch annotations for this view. We load all record rows and
+    // filter client-side, matching both the image row id (new annotations)
+    // and the view logical name (legacy annotations where view_id was the
+    // camera name rather than the image row id) so existing data is always
+    // visible.
+    const [allBBoxes, allKeypoints] = image
+      ? await Promise.all([
+          gateway.listBBoxes(datasetId, { recordId }).catch(() => [] as BBoxRow[]),
+          gateway
+            .listAnnotations<KeyPointsRow>(datasetId, KEYPOINTS_RESOURCE, { recordId })
+            .catch(() => [] as KeyPointsRow[]),
+        ])
+      : [[] as BBoxRow[], [] as KeyPointsRow[]];
 
-    const existingBBoxes = allBBoxes.filter(
-      (b) => b.view_id === image?.id || b.view_id === viewName,
-    );
+    const matchesView = (viewId: string) => viewId === image?.id || viewId === viewName;
+    const existingBBoxes = allBBoxes.filter((b) => matchesView(b.view_id));
 
     const iw = image?.width ?? 1;
     const ih = image?.height ?? 1;
@@ -105,6 +113,25 @@ export const ImageExtension = WidgetExtension.create<ImageWidgetOptions, ImageWi
         };
       });
 
+    // Keypoint coords follow our normalized [0,1] convention (the backend
+    // KeyPoints schema carries no is_normalized flag).
+    const seedKeypoints = allKeypoints
+      .filter((k) => matchesView(k.view_id) && Array.isArray(k.coords) && k.coords.length % 2 === 0)
+      .map<LocalKeypoints>((k) => {
+        const points: { x: number; y: number }[] = [];
+        for (let i = 0; i < k.coords.length; i += 2) {
+          points.push({ x: k.coords[i], y: k.coords[i + 1] });
+        }
+        return {
+          id: k.id,
+          entityId: k.entity_id,
+          kind: "keypoints",
+          geometry: { points },
+          persisted: true,
+          entity: entitiesById.get(k.entity_id),
+        };
+      });
+
     return {
       title: viewName,
       options: {
@@ -117,7 +144,7 @@ export const ImageExtension = WidgetExtension.create<ImageWidgetOptions, ImageWi
         calibration: _extractCalibration(image),
       },
       data: { imageUrl: image?.src },
-      storage: { annotations: new AnnotationCollection(seedBBoxes) },
+      storage: { annotations: new AnnotationCollection([...seedBBoxes, ...seedKeypoints]) },
     };
   },
 });

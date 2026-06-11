@@ -6,6 +6,8 @@ License: CECILL-C
 
 import { bboxRenderer2DFactory } from "../kinds/2d/bbox/bboxRenderer2D.js";
 import { drawBBoxTool } from "../kinds/2d/bbox/drawBBoxTool.js";
+import { drawKeypointsTool } from "../kinds/2d/keypoints/drawKeypointsTool.js";
+import { keypointsRenderer2DFactory } from "../kinds/2d/keypoints/keypointsRenderer2D.js";
 import { selectTool2D } from "./selectTool2D.js";
 import type { AnnotationRenderer2DFactory, Tool2D } from "./types2d.js";
 
@@ -14,10 +16,13 @@ import type { AnnotationRenderer2DFactory, Tool2D } from "./types2d.js";
  * its tool import here — widgets render their toolbar from this list and
  * never reference individual tools.
  */
-export const TOOLS_2D: readonly Tool2D[] = [selectTool2D, drawBBoxTool];
+export const TOOLS_2D: readonly Tool2D[] = [selectTool2D, drawBBoxTool, drawKeypointsTool];
 
 /** Every 2D renderer factory; widgets instantiate one renderer per kind. */
-export const RENDERER_FACTORIES_2D: readonly AnnotationRenderer2DFactory[] = [bboxRenderer2DFactory];
+export const RENDERER_FACTORIES_2D: readonly AnnotationRenderer2DFactory[] = [
+  bboxRenderer2DFactory,
+  keypointsRenderer2DFactory,
+];
 
 export { DEFAULT_TOOL_2D } from "./types2d.js";
 

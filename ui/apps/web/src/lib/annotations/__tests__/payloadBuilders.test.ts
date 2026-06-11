@@ -6,7 +6,11 @@ License: CECILL-C
 
 import { describe, expect, it } from "vitest";
 
-import type { LocalBBox, LocalBBox3DAnnotation } from "../annotationCollection.svelte.js";
+import type {
+  LocalBBox,
+  LocalBBox3DAnnotation,
+  LocalKeypoints,
+} from "../annotationCollection.svelte.js";
 import { buildDeleteMutations, payloadBuilderFor } from "../payloadBuilders.js";
 
 const CTX = { datasetId: "ds", recordId: "rec", viewId: "view" };
@@ -27,11 +31,20 @@ const BBOX3D: LocalBBox3DAnnotation = {
   persisted: false,
 };
 
+const KEYPOINTS: LocalKeypoints = {
+  id: "ann-kp",
+  entityId: "ent-kp",
+  kind: "keypoints",
+  geometry: { points: [{ x: 0.1, y: 0.2 }, { x: 0.3, y: 0.4 }] },
+  persisted: false,
+};
+
 describe("payloadBuilderFor", () => {
   it("resolves a builder per registered kind and throws for unknown kinds", () => {
     expect(payloadBuilderFor("bbox").resource).toBe("bboxes");
     expect(payloadBuilderFor("bbox3d").resource).toBe("bbox3ds");
-    expect(() => payloadBuilderFor("keypoints")).toThrow(/keypoints/);
+    expect(payloadBuilderFor("keypoints").resource).toBe("keypoints");
+    expect(() => payloadBuilderFor("mask")).toThrow(/mask/);
   });
 });
 
@@ -69,6 +82,30 @@ describe("bbox3d payload builder", () => {
     expect(bbox3d.body.id).toBe("ann-3d");
     expect(bbox3d.body.coords).toEqual([1, 2, 3, 4, 5, 6]);
     expect(bbox3d.body.rotation).toEqual([1, 0, 0, 0, 1, 0, 0, 0, 1]);
+  });
+});
+
+describe("keypoints payload builder", () => {
+  it("buildCreate flattens points to coords with one visible state per point", () => {
+    const mutations = payloadBuilderFor("keypoints").buildCreate(CTX, KEYPOINTS, "w1");
+
+    expect(mutations).toHaveLength(2);
+    const [entity, keypoints] = mutations as { body: Record<string, unknown> }[];
+    expect(entity.body.id).toBe("ent-kp");
+    expect(keypoints.body).toMatchObject({
+      id: "ann-kp",
+      entity_id: "ent-kp",
+      template_id: "",
+      coords: [0.1, 0.2, 0.3, 0.4],
+      states: ["visible", "visible"],
+      frame_id: "view",
+    });
+  });
+
+  it("buildUpdate carries the same geometry without frame linkage fields", () => {
+    const body = payloadBuilderFor("keypoints").buildUpdate(CTX, KEYPOINTS);
+    expect(body).toMatchObject({ id: "ann-kp", coords: [0.1, 0.2, 0.3, 0.4] });
+    expect(body).not.toHaveProperty("frame_id");
   });
 });
 

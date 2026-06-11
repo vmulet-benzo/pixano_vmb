@@ -41,6 +41,7 @@ function makeGateway(image: CalibratedImageResponse | null, bboxes: BBoxRow[]): 
     listBBoxes: () => Promise.resolve(bboxes),
     loadPointCloudByLogicalName: () => Promise.resolve(null),
     listBBox3Ds: () => Promise.resolve([]),
+      listAnnotations: () => Promise.resolve([]),
     createEntity: () => Promise.resolve({}),
     deleteEntity: () => Promise.resolve(),
     createAnnotation: () => Promise.resolve({}),

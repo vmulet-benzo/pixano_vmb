@@ -57,6 +57,13 @@ export interface RecordReadGateway {
     datasetId: string,
     params: { recordId?: string; viewId?: string; limit?: number },
   ): Promise<BBox3DRow[]>;
+
+  /** Generic listing for any annotation resource (e.g. "keypoints"). */
+  listAnnotations<T = Record<string, unknown>>(
+    datasetId: string,
+    resource: string,
+    params: { recordId?: string; viewId?: string; limit?: number },
+  ): Promise<T[]>;
 }
 
 export interface MutationGateway {
@@ -100,6 +107,7 @@ export const httpDatasetGateway: DatasetGateway = {
   loadPointCloudByLogicalName: (datasetId, recordId, logicalName) =>
     api.loadPointCloudByLogicalName(datasetId, recordId, logicalName),
   listBBox3Ds: (datasetId, params) => api.listBBox3Ds(datasetId, params),
+  listAnnotations: (datasetId, resource, params) => api.listAnnotations(datasetId, resource, params),
 
   createEntity: (datasetId, body) => api.createEntity(datasetId, body),
   deleteEntity: (datasetId, id) => api.deleteEntity(datasetId, id),

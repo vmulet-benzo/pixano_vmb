@@ -73,6 +73,7 @@ function makeGateway(state: FakeGatewayState) {
       calls.listBBox3Ds++;
       return Promise.resolve(state.bboxes3d);
     },
+    listAnnotations: <T,>() => Promise.resolve([] as T[]),
     createEntity: () => Promise.resolve({}),
     deleteEntity: () => Promise.resolve(),
     createAnnotation: () => Promise.resolve({}),
@@ -400,6 +401,7 @@ describe("WorkspaceManager.selectRecordInDataset", () => {
       listBBoxes: () => Promise.resolve([]),
       loadPointCloudByLogicalName: () => Promise.resolve(null),
       listBBox3Ds: () => Promise.resolve([]),
+      listAnnotations: () => Promise.resolve([]),
       createEntity: () => Promise.resolve({}),
       createBBox: () => Promise.resolve({}),
       updateBBox: () => Promise.resolve({}),

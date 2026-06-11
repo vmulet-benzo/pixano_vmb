@@ -63,6 +63,7 @@ function makeGateway(opts: {
     loadPointCloudByLogicalName: (_, __, name) =>
       Promise.resolve(opts.pointClouds?.get(name) ?? null),
     listBBox3Ds: () => Promise.resolve(opts.bboxes3d ?? []),
+    listAnnotations: <T,>() => Promise.resolve([] as T[]),
     createEntity: () => Promise.resolve({}),
     deleteEntity: () => Promise.resolve(),
     createAnnotation: () => Promise.resolve({}),
