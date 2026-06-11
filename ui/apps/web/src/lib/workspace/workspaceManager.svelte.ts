@@ -29,7 +29,7 @@ import { WorkspaceSession } from "./workspaceSession.svelte.js";
  *  - `pendingMutations`, `saving`,   → `MutationQueue`
  *    `saveError`, `pendingCount`,
  *    `queueMutation`, `flushSave`,
- *    `dropMutationsForLocalBBox`
+ *    `dropMutationsForLocalAnnotation`
  *  - `selectRecordInDataset`         → `RecordLoader`
  *
  * The single public surface keeps consumers (LeftPanel, Toolbar,
@@ -56,13 +56,13 @@ export class WorkspaceManager {
     // Each extension owns the knowledge of its own storage shape via findLocalDraft.
     // The manager delegates rather than enumerating widget-type-specific fields.
     this.mutations = new MutationQueue(gateway, this.session, {
-      findLocalBBox: (widgetId, localBBoxId) => {
+      findLocalAnnotation: (widgetId, localAnnotationId) => {
         const storage = this.storageMap.get(widgetId);
         if (!storage) return undefined;
         const widget = this.widgets.find((w) => w.id === widgetId);
         if (!widget) return undefined;
         const config = this.registry.get(widget.extensionName);
-        return config?.findLocalDraft?.(storage, localBBoxId);
+        return config?.findLocalDraft?.(storage, localAnnotationId);
       },
     });
 
@@ -119,8 +119,8 @@ export class WorkspaceManager {
   }
 
   /** Drop every queued mutation referencing the given local bbox id. */
-  dropMutationsForLocalBBox(localBBoxId: string): ResourceMutation[] {
-    return this.mutations.dropForLocalBBox(localBBoxId);
+  dropMutationsForLocalAnnotation(localAnnotationId: string): ResourceMutation[] {
+    return this.mutations.dropForLocalAnnotation(localAnnotationId);
   }
 
   /** Flush every queued mutation to the backend. */

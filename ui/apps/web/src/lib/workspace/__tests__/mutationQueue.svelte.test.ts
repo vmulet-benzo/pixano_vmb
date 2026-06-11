@@ -10,7 +10,7 @@ import type { ResourceMutation } from "$lib/annotations/types.js";
 import { ApiError } from "$lib/api/apiClient.js";
 
 import type { MutationGateway } from "../datasetGateway.js";
-import { MutationQueue, type LocalBBoxLocator } from "../mutationQueue.svelte.js";
+import { MutationQueue, type LocalAnnotationLocator } from "../mutationQueue.svelte.js";
 import { WorkspaceSession } from "../workspaceSession.svelte.js";
 
 // ─── Test scaffolding ───────────────────────────────────────────────────────
@@ -60,8 +60,8 @@ function makeSession(datasetId: string | null = "ds-1"): WorkspaceSession {
   return session;
 }
 
-const noopLocator: LocalBBoxLocator = {
-  findLocalBBox: () => undefined,
+const noopLocator: LocalAnnotationLocator = {
+  findLocalAnnotation: () => undefined,
 };
 
 // ─── Tests ──────────────────────────────────────────────────────────────────
@@ -116,9 +116,9 @@ describe("MutationQueue.flush", () => {
   it("marks the LocalBBox as persisted after a successful create", async () => {
     const { gateway } = makeGateway();
     const bbox = { persisted: false };
-    const locator: LocalBBoxLocator = {
-      findLocalBBox: (widgetId, localBBoxId) =>
-        widgetId === "w-1" && localBBoxId === "lb-1" ? bbox : undefined,
+    const locator: LocalAnnotationLocator = {
+      findLocalAnnotation: (widgetId, localAnnotationId) =>
+        widgetId === "w-1" && localAnnotationId === "lb-1" ? bbox : undefined,
     };
     const queue = new MutationQueue(gateway, makeSession(), locator);
 
@@ -127,7 +127,7 @@ describe("MutationQueue.flush", () => {
       resource: "bboxes",
       body: {},
       widgetId: "w-1",
-      localBBoxId: "lb-1",
+      localAnnotationId: "lb-1",
     } as ResourceMutation);
 
     await queue.flush();
@@ -197,7 +197,7 @@ describe("MutationQueue.flush", () => {
   });
 });
 
-describe("MutationQueue.dropForLocalBBox", () => {
+describe("MutationQueue.dropForLocalAnnotation", () => {
   it("removes every queued mutation referencing the given local bbox id", () => {
     const { gateway } = makeGateway();
     const queue = new MutationQueue(gateway, makeSession(), noopLocator);
@@ -206,26 +206,26 @@ describe("MutationQueue.dropForLocalBBox", () => {
       op: "create",
       resource: "bboxes",
       body: {},
-      localBBoxId: "lb-doomed",
+      localAnnotationId: "lb-doomed",
     } as ResourceMutation);
     queue.queue({
       op: "update",
       resource: "bboxes",
       id: "x",
       body: {},
-      localBBoxId: "lb-doomed",
+      localAnnotationId: "lb-doomed",
     } as ResourceMutation);
     queue.queue({
       op: "create",
       resource: "bboxes",
       body: {},
-      localBBoxId: "lb-keep",
+      localAnnotationId: "lb-keep",
     } as ResourceMutation);
 
-    const dropped = queue.dropForLocalBBox("lb-doomed");
+    const dropped = queue.dropForLocalAnnotation("lb-doomed");
 
     expect(dropped).toHaveLength(2);
     expect(queue.count).toBe(1);
-    expect(queue.pending[0].localBBoxId).toBe("lb-keep");
+    expect(queue.pending[0].localAnnotationId).toBe("lb-keep");
   });
 });

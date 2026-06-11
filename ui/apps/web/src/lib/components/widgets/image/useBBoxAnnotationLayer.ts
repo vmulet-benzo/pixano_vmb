@@ -139,7 +139,7 @@ export class BBoxAnnotationLayer {
           id: bbox.id,
           body,
           widgetId: this.widgetId,
-          localBBoxId: bbox.id,
+          localAnnotationId: bbox.id,
         });
       }
     } else {
@@ -148,7 +148,7 @@ export class BBoxAnnotationLayer {
           m.op === "create" &&
           m.resource === "bboxes" &&
           m.widgetId === this.widgetId &&
-          m.localBBoxId === bbox.id,
+          m.localAnnotationId === bbox.id,
       );
       if (pending && pending.op === "create") {
         (pending.body as Record<string, unknown>).coords = Array.from(coordsNorm);
@@ -168,17 +168,17 @@ export class BBoxAnnotationLayer {
         resource: "bboxes",
         id: bbox.id,
         widgetId: this.widgetId,
-        localBBoxId: bbox.id,
+        localAnnotationId: bbox.id,
       });
       this.manager.queueMutation({
         op: "delete",
         resource: "entities",
         id: bbox.entityId,
         widgetId: this.widgetId,
-        localBBoxId: bbox.id,
+        localAnnotationId: bbox.id,
       });
     } else {
-      this.manager.dropMutationsForLocalBBox(bbox.id);
+      this.manager.dropMutationsForLocalAnnotation(bbox.id);
     }
 
     this.storage.bboxes = this.storage.bboxes.filter((b) => b.id !== bbox.id);

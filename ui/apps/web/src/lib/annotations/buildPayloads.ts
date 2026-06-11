@@ -62,7 +62,7 @@ const DEFAULT_SOURCE = {
 export function buildBBoxCreate(
   ctx: BuildContext,
   coordsNorm: CoordsNorm,
-  opts: { widgetId?: string; localBBoxId?: string; entityId?: string; bboxId?: string } = {},
+  opts: { widgetId?: string; localAnnotationId?: string; entityId?: string; bboxId?: string } = {},
 ): BuildBBoxResult {
   const entityId = opts.entityId ?? generateShortId();
   const bboxId = opts.bboxId ?? generateShortId();
@@ -98,14 +98,14 @@ export function buildBBoxCreate(
       resource: "entities",
       body: entityBody,
       widgetId: opts.widgetId,
-      localBBoxId: opts.localBBoxId,
+      localAnnotationId: opts.localAnnotationId,
     },
     {
       op: "create",
       resource: "bboxes",
       body: bboxBody,
       widgetId: opts.widgetId,
-      localBBoxId: opts.localBBoxId,
+      localAnnotationId: opts.localAnnotationId,
     },
   ];
 
@@ -167,7 +167,7 @@ export function buildBBox3DUpdate(
 export function buildBBox3DCreate(
   ctx: BuildContext,
   coordsLance: [number, number, number, number, number, number],
-  opts: { widgetId?: string; localBBoxId?: string; entityId?: string; bboxId?: string; rotation?: number[] } = {},
+  opts: { widgetId?: string; localAnnotationId?: string; entityId?: string; bboxId?: string; rotation?: number[] } = {},
 ): BuildBBoxResult {
   const entityId = opts.entityId ?? generateShortId();
   const bboxId = opts.bboxId ?? generateShortId();
@@ -192,14 +192,14 @@ export function buildBBox3DCreate(
       resource: "entities",
       body: entityBody,
       widgetId: opts.widgetId,
-      localBBoxId: opts.localBBoxId,
+      localAnnotationId: opts.localAnnotationId,
     },
     {
       op: "create",
       resource: "bbox3ds",
       body: bboxBody,
       widgetId: opts.widgetId,
-      localBBoxId: opts.localBBoxId,
+      localAnnotationId: opts.localAnnotationId,
     },
   ];
 

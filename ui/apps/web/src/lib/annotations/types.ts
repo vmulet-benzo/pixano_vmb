@@ -131,7 +131,7 @@ export type ResourceMutation =
       /** Widget this mutation belongs to; used to flip `persisted` after success. */
       widgetId?: string;
       /** Local bbox id this mutation belongs to (for create/update/delete pairing). */
-      localBBoxId?: string;
+      localAnnotationId?: string;
     }
   | {
       op: "update";
@@ -139,12 +139,12 @@ export type ResourceMutation =
       id: string;
       body: Record<string, unknown>;
       widgetId?: string;
-      localBBoxId?: string;
+      localAnnotationId?: string;
     }
   | {
       op: "delete";
       resource: string;
       id: string;
       widgetId?: string;
-      localBBoxId?: string;
+      localAnnotationId?: string;
     };
