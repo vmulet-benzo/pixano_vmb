@@ -11,8 +11,8 @@ import { AnnotationCollection, type LocalBBox } from "../../annotationCollection
 import { selectTool2D } from "../selectTool2D.js";
 import { DEFAULT_TOOL_2D, type Scene2DContext } from "../types2d.js";
 
-function makeBBox(id: string): LocalBBox {
-  return { id, entityId: `e-${id}`, kind: "bbox", geometry: [0.1, 0.1, 0.2, 0.2], persisted: true };
+function makeBBox(id: string, persisted = true): LocalBBox {
+  return { id, entityId: `e-${id}`, kind: "bbox", geometry: [0.1, 0.1, 0.2, 0.2], persisted };
 }
 
 function makeContext(collection: AnnotationCollection) {
@@ -27,7 +27,6 @@ function makeContext(collection: AnnotationCollection) {
     getKonvaImage: () => null,
     setActiveTool: vi.fn(),
     requestRedraw: vi.fn(),
-    deleteSelected: vi.fn(),
   };
   return { ctx, stage };
 }
@@ -62,7 +61,7 @@ describe("selectTool2D", () => {
     expect(collection.selectedId).toBe("a");
   });
 
-  it("Escape deselects, Delete removes the selection", () => {
+  it("Escape deselects", () => {
     const collection = new AnnotationCollection([makeBBox("a")]);
     collection.select("a");
     const { ctx } = makeContext(collection);
@@ -70,10 +69,38 @@ describe("selectTool2D", () => {
 
     expect(handler.onKeyDown!(new KeyboardEvent("keydown", { key: "Escape" }))).toBe(true);
     expect(collection.selectedId).toBeNull();
+  });
 
+  it("Delete queues backend deletes for a persisted selection and removes it", () => {
+    const collection = new AnnotationCollection([makeBBox("a", true)]);
     collection.select("a");
+    const { ctx } = makeContext(collection);
+    const handler = selectTool2D.createHandler(ctx);
+
     expect(handler.onKeyDown!(new KeyboardEvent("keydown", { key: "Delete" }))).toBe(true);
-    expect(ctx.deleteSelected).toHaveBeenCalledTimes(1);
+
+    expect(collection.find("a")).toBeUndefined();
+    // One delete for the bbox row, one for its parent entity.
+    expect(ctx.mutations.queue).toHaveBeenCalledTimes(2);
+    expect(ctx.mutations.queue).toHaveBeenCalledWith(
+      expect.objectContaining({ op: "delete", resource: "bboxes", id: "a" }),
+    );
+    expect(ctx.mutations.queue).toHaveBeenCalledWith(
+      expect.objectContaining({ op: "delete", resource: "entities", id: "e-a" }),
+    );
+  });
+
+  it("Delete drops pending creates for an unsaved selection instead of queueing", () => {
+    const collection = new AnnotationCollection([makeBBox("a", false)]);
+    collection.select("a");
+    const { ctx } = makeContext(collection);
+    const handler = selectTool2D.createHandler(ctx);
+
+    handler.onKeyDown!(new KeyboardEvent("keydown", { key: "Backspace" }));
+
+    expect(collection.find("a")).toBeUndefined();
+    expect(ctx.mutations.queue).not.toHaveBeenCalled();
+    expect(ctx.mutations.dropForLocalAnnotation).toHaveBeenCalledWith("a");
   });
 
   it("ignores Delete without a selection and unrelated keys", () => {
@@ -83,6 +110,6 @@ describe("selectTool2D", () => {
 
     expect(handler.onKeyDown!(new KeyboardEvent("keydown", { key: "Delete" }))).toBe(false);
     expect(handler.onKeyDown!(new KeyboardEvent("keydown", { key: "a" }))).toBe(false);
-    expect(ctx.deleteSelected).not.toHaveBeenCalled();
+    expect(ctx.mutations.queue).not.toHaveBeenCalled();
   });
 });

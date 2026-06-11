@@ -9,12 +9,16 @@ License: CECILL-C
   import { Save, Trash2 } from "lucide-svelte";
   import { getContext, onMount } from "svelte";
 
-  import { DEFAULT_TOOL_2D, getTool2D, TOOLS_2D } from "$lib/annotations/tools/registry2d.js";
-  import type { Scene2DContext, ToolHandler2D } from "$lib/annotations/tools/types2d.js";
+  import { deleteLocalAnnotation } from "$lib/annotations/payloadBuilders.js";
+  import {
+    DEFAULT_TOOL_2D,
+    getTool2D,
+    RENDERER_FACTORIES_2D,
+    TOOLS_2D,
+  } from "$lib/annotations/tools/registry2d.js";
+  import type { AnnotationRenderer2D, Scene2DContext, ToolHandler2D } from "$lib/annotations/tools/types2d.js";
   import type { ImageWidgetOptions, ImageWidgetStorage } from "$lib/annotations/types.js";
   import type { WorkspaceManager } from "$lib/workspace/workspaceManager.svelte.js";
-
-  import { BBoxAnnotationLayer } from "./useBBoxAnnotationLayer.js";
 
   interface Props {
     widgetId: string;
@@ -42,9 +46,13 @@ License: CECILL-C
   let loadedImg: HTMLImageElement | null = null;
   let placeholderShapes: Konva.Node[] = [];
 
-  let annotationRef: BBoxAnnotationLayer | null = null;
+  let renderers: AnnotationRenderer2D[] = [];
   let sceneContext: Scene2DContext | null = null;
   let activeHandler: ToolHandler2D | null = null;
+
+  function syncRenderers() {
+    for (const renderer of renderers) renderer.sync();
+  }
 
   function fitImageToStage() {
     if (!stage || !konvaImage || !loadedImg) return;
@@ -58,7 +66,7 @@ License: CECILL-C
     konvaImage.x((sw - iw) / 2);
     konvaImage.y((sh - ih) / 2);
     imageLayer?.batchDraw();
-    annotationRef?.redrawBoxes();
+    syncRenderers();
   }
 
   function redrawPlaceholder() {
@@ -106,15 +114,6 @@ License: CECILL-C
     stage.add(imageLayer);
     stage.add(annotationLayer);
 
-    annotationRef = new BBoxAnnotationLayer(
-      annotationLayer,
-      () => konvaImage,
-      storage,
-      manager,
-      stableWidgetId,
-      imgOptions,
-    );
-
     sceneContext = {
       widgetId: stableWidgetId,
       buildContext: {
@@ -136,9 +135,10 @@ License: CECILL-C
       setActiveTool: (id) => {
         storage.activeToolId = id;
       },
-      requestRedraw: () => annotationRef?.redrawBoxes(),
-      deleteSelected: () => annotationRef?.deleteSelected(),
+      requestRedraw: () => syncRenderers(),
     };
+
+    renderers = RENDERER_FACTORIES_2D.map((factory) => factory.create(sceneContext!));
 
     stage.on("mousedown touchstart", (e) => activeHandler?.onPointerDown?.(e));
     stage.on("mousemove touchmove", (e) => activeHandler?.onPointerMove?.(e));
@@ -154,7 +154,7 @@ License: CECILL-C
         imageLayer.add(konvaImage);
         fitImageToStage();
         imageLoaded = true;
-        annotationRef?.redrawBoxes();
+        syncRenderers();
       };
       img.onerror = () => { imageError = true; };
       img.src = imageUrl;
@@ -189,8 +189,8 @@ License: CECILL-C
       activeHandler = null;
       sceneContext = null;
       sceneReady = false;
-      annotationRef?.destroy();
-      annotationRef = null;
+      for (const renderer of renderers) renderer.destroy();
+      renderers = [];
       stage?.destroy();
       stage = null;
       imageLayer = null;
@@ -214,7 +214,7 @@ License: CECILL-C
   $effect(() => {
     void storage.annotations.items.length;
     void storage.annotations.selectedId;
-    if (imageLoaded) annotationRef?.redrawBoxes();
+    if (imageLoaded) syncRenderers();
   });
 
   const hasSelection = $derived(storage.annotations.selectedId !== null);
@@ -247,7 +247,12 @@ License: CECILL-C
     <span class="mx-1 h-4 w-px bg-border"></span>
     <button
       type="button"
-      onclick={() => sceneContext?.deleteSelected()}
+      onclick={() => {
+        const annotation = storage.annotations.selected;
+        if (!annotation || !sceneContext) return;
+        deleteLocalAnnotation(annotation, storage.annotations, sceneContext.mutations, stableWidgetId);
+        syncRenderers();
+      }}
       disabled={!hasSelection}
       title="Delete selected (Del)"
       class="rounded p-1 text-muted-foreground hover:bg-destructive/20 hover:text-destructive disabled:opacity-40"

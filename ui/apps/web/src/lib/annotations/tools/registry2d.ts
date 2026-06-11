@@ -4,9 +4,10 @@ Author : pixano@cea.fr
 License: CECILL-C
 -------------------------------------*/
 
+import { bboxRenderer2DFactory } from "../kinds/2d/bbox/bboxRenderer2D.js";
 import { drawBBoxTool } from "../kinds/2d/bbox/drawBBoxTool.js";
 import { selectTool2D } from "./selectTool2D.js";
-import type { Tool2D } from "./types2d.js";
+import type { AnnotationRenderer2DFactory, Tool2D } from "./types2d.js";
 
 /**
  * Every 2D tool, in toolbar order. Adding an annotation kind means adding
@@ -14,6 +15,9 @@ import type { Tool2D } from "./types2d.js";
  * never reference individual tools.
  */
 export const TOOLS_2D: readonly Tool2D[] = [selectTool2D, drawBBoxTool];
+
+/** Every 2D renderer factory; widgets instantiate one renderer per kind. */
+export const RENDERER_FACTORIES_2D: readonly AnnotationRenderer2DFactory[] = [bboxRenderer2DFactory];
 
 export { DEFAULT_TOOL_2D } from "./types2d.js";
 

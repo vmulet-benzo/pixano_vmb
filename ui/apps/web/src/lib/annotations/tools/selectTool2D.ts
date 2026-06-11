@@ -6,6 +6,7 @@ License: CECILL-C
 
 import { MousePointer2 } from "lucide-svelte";
 
+import { deleteLocalAnnotation } from "../payloadBuilders.js";
 import { DEFAULT_TOOL_2D, type Scene2DContext, type Tool2D, type ToolHandler2D } from "./types2d.js";
 
 /**
@@ -29,8 +30,11 @@ class SelectHandler2D implements ToolHandler2D {
       this.ctx.requestRedraw();
       return true;
     }
-    if ((event.key === "Delete" || event.key === "Backspace") && this.ctx.collection.selectedId) {
-      this.ctx.deleteSelected();
+    if (event.key === "Delete" || event.key === "Backspace") {
+      const annotation = this.ctx.collection.selected;
+      if (!annotation) return false;
+      deleteLocalAnnotation(annotation, this.ctx.collection, this.ctx.mutations, this.ctx.widgetId);
+      this.ctx.requestRedraw();
       return true;
     }
     return false;

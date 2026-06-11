@@ -7,33 +7,38 @@ License: CECILL-C
 import Konva from "konva";
 
 import type { LocalBBox } from "$lib/annotations/annotationCollection.svelte.js";
-import { buildBBoxUpdate } from "$lib/annotations/buildPayloads.js";
-import type { CoordsNorm, ImageWidgetOptions, ImageWidgetStorage } from "$lib/annotations/types.js";
-import { pickEntityLabel } from "$lib/annotations/types.js";
-import type { WorkspaceManager } from "$lib/workspace/workspaceManager.svelte.js";
-
+import type { CoordsNorm } from "$lib/annotations/types.js";
 import {
   BBOX_COLOR_DRAFT,
   BBOX_COLOR_PERSISTED,
   getPixelFrame,
   normalizedToPixel,
-  type PixelFrame,
   pixelToNormalized,
-} from "./imageWidgetGeometry.js";
+  type PixelFrame,
+} from "$lib/annotations/tools/scene2dGeometry.js";
+import type {
+  AnnotationRenderer2D,
+  AnnotationRenderer2DFactory,
+  Scene2DContext,
+} from "$lib/annotations/tools/types2d.js";
+import { pickEntityLabel } from "$lib/annotations/types.js";
 
-export class BBoxAnnotationLayer {
+import { bboxPayloadBuilder } from "./bboxPayloadBuilder.js";
+
+/**
+ * Renders the "bbox" kind on the Konva scene: one rect (+ optional entity
+ * label) per annotation, a shared transformer for the selection, and the
+ * drag/transform handlers that write geometry changes back through the
+ * collection and the mutation queue.
+ */
+class BBoxRenderer2D implements AnnotationRenderer2D {
+  readonly kind = "bbox" as const;
+
   private readonly rectByBBoxId = new Map<string, Konva.Rect>();
   private readonly labelByBBoxId = new Map<string, Konva.Label>();
-  readonly transformer: Konva.Transformer;
+  private readonly transformer: Konva.Transformer;
 
-  constructor(
-    private readonly layer: Konva.Layer,
-    private readonly getKonvaImage: () => Konva.Image | null,
-    private readonly storage: ImageWidgetStorage,
-    private readonly manager: WorkspaceManager,
-    private readonly widgetId: string,
-    private readonly imgOptions: ImageWidgetOptions,
-  ) {
+  constructor(private readonly ctx: Scene2DContext) {
     this.transformer = new Konva.Transformer({
       rotateEnabled: false,
       anchorStroke: BBOX_COLOR_PERSISTED,
@@ -42,20 +47,20 @@ export class BBoxAnnotationLayer {
       keepRatio: false,
       ignoreStroke: true,
     });
-    layer.add(this.transformer);
+    ctx.annotationLayer.add(this.transformer);
   }
 
-  redrawBoxes(): void {
-    const frame = getPixelFrame(this.getKonvaImage());
+  sync(): void {
+    const frame = getPixelFrame(this.ctx.getKonvaImage());
     const activeIds = new Set<string>();
 
-    for (const bbox of this.storage.annotations.byKind<CoordsNorm>("bbox")) {
+    for (const bbox of this.ctx.collection.byKind<CoordsNorm>("bbox")) {
       activeIds.add(bbox.id);
       let rect = this.rectByBBoxId.get(bbox.id);
       if (!rect) {
         const newRect = this._makeRect(bbox, frame);
         if (!newRect) continue;
-        this.layer.add(newRect);
+        this.ctx.annotationLayer.add(newRect);
         this.rectByBBoxId.set(bbox.id, newRect);
         rect = newRect;
       } else if (frame) {
@@ -71,7 +76,7 @@ export class BBoxAnnotationLayer {
       if (!label) {
         label = this._makeLabel(bbox.persisted, bbox.entity) ?? undefined;
         if (label) {
-          this.layer.add(label);
+          this.ctx.annotationLayer.add(label);
           this.labelByBBoxId.set(bbox.id, label);
         }
       }
@@ -85,18 +90,21 @@ export class BBoxAnnotationLayer {
       if (!activeIds.has(id)) { label.destroy(); this.labelByBBoxId.delete(id); }
     }
 
-    this.syncTransformer();
-    this.layer.batchDraw();
+    this._syncTransformer();
+    this.ctx.annotationLayer.batchDraw();
   }
 
-  syncTransformer(): void {
-    const id = this.storage.annotations.selectedId;
-    if (!id) {
-      this.transformer.nodes([]);
-      this.transformer.getLayer()?.batchDraw();
-      return;
-    }
-    const rect = this.rectByBBoxId.get(id);
+  destroy(): void {
+    this.transformer.destroy();
+    for (const rect of this.rectByBBoxId.values()) rect.destroy();
+    this.rectByBBoxId.clear();
+    for (const label of this.labelByBBoxId.values()) label.destroy();
+    this.labelByBBoxId.clear();
+  }
+
+  private _syncTransformer(): void {
+    const id = this.ctx.collection.selectedId;
+    const rect = id ? this.rectByBBoxId.get(id) : undefined;
     if (rect) {
       this.transformer.nodes([rect]);
       this.transformer.moveToTop();
@@ -106,92 +114,53 @@ export class BBoxAnnotationLayer {
     this.transformer.getLayer()?.batchDraw();
   }
 
-  selectBBox(id: string | null): void {
-    this.storage.annotations.select(id);
-    this.syncTransformer();
+  private _select(id: string | null): void {
+    this.ctx.collection.select(id);
+    this._syncTransformer();
   }
 
-  commitRectGeometry(bboxId: string, rect: Konva.Rect): void {
-    const frame = getPixelFrame(this.getKonvaImage());
+  private _commitRectGeometry(bboxId: string, rect: Konva.Rect): void {
+    const frame = getPixelFrame(this.ctx.getKonvaImage());
     if (!frame || frame.w <= 0 || frame.h <= 0) return;
 
-    const bbox = this.storage.annotations.find(bboxId);
+    const bbox = this.ctx.collection.find(bboxId);
     if (!bbox) return;
 
     const coordsNorm = pixelToNormalized(rect.x(), rect.y(), rect.width(), rect.height(), frame);
-    this.storage.annotations.setGeometry(bboxId, coordsNorm);
+    this.ctx.collection.setGeometry(bboxId, coordsNorm);
 
     if (bbox.persisted) {
-      const ctx = {
-        datasetId: this.imgOptions.datasetId,
-        recordId: this.imgOptions.recordId,
-        viewId: this.imgOptions.viewId,
-      };
-      const body = buildBBoxUpdate(ctx, bbox.id, bbox.entityId, coordsNorm);
-      const existing = this.manager.pendingMutations.find(
-        (m) => m.op === "update" && m.resource === "bboxes" && m.id === bbox.id,
+      const body = bboxPayloadBuilder.buildUpdate(
+        this.ctx.buildContext,
+        bbox as LocalBBox,
+      );
+      const existing = this.ctx.mutations.pending.find(
+        (m) => m.op === "update" && m.resource === bboxPayloadBuilder.resource && m.id === bbox.id,
       );
       if (existing && existing.op === "update") {
         existing.body = body;
       } else {
-        this.manager.queueMutation({
+        this.ctx.mutations.queue({
           op: "update",
-          resource: "bboxes",
+          resource: bboxPayloadBuilder.resource,
           id: bbox.id,
           body,
-          widgetId: this.widgetId,
+          widgetId: this.ctx.widgetId,
           localAnnotationId: bbox.id,
         });
       }
     } else {
-      const pending = this.manager.pendingMutations.find(
+      const pending = this.ctx.mutations.pending.find(
         (m) =>
           m.op === "create" &&
-          m.resource === "bboxes" &&
-          m.widgetId === this.widgetId &&
+          m.resource === bboxPayloadBuilder.resource &&
+          m.widgetId === this.ctx.widgetId &&
           m.localAnnotationId === bbox.id,
       );
       if (pending && pending.op === "create") {
         (pending.body as Record<string, unknown>).coords = Array.from(coordsNorm);
       }
     }
-  }
-
-  deleteSelected(): void {
-    const id = this.storage.annotations.selectedId;
-    if (!id) return;
-    const bbox = this.storage.annotations.find(id);
-    if (!bbox) return;
-
-    if (bbox.persisted) {
-      this.manager.queueMutation({
-        op: "delete",
-        resource: "bboxes",
-        id: bbox.id,
-        widgetId: this.widgetId,
-        localAnnotationId: bbox.id,
-      });
-      this.manager.queueMutation({
-        op: "delete",
-        resource: "entities",
-        id: bbox.entityId,
-        widgetId: this.widgetId,
-        localAnnotationId: bbox.id,
-      });
-    } else {
-      this.manager.dropMutationsForLocalAnnotation(bbox.id);
-    }
-
-    this.storage.annotations.remove(bbox.id);
-    this.redrawBoxes();
-  }
-
-  destroy(): void {
-    this.transformer.destroy();
-    for (const rect of this.rectByBBoxId.values()) rect.destroy();
-    this.rectByBBoxId.clear();
-    for (const label of this.labelByBBoxId.values()) label.destroy();
-    this.labelByBBoxId.clear();
   }
 
   private _positionLabel(label: Konva.Label, rect: Konva.Rect): void {
@@ -215,13 +184,13 @@ export class BBoxAnnotationLayer {
       name: "bbox",
     });
     rect.setAttr("bboxId", bbox.id);
-    rect.on("click tap", (e) => { e.cancelBubble = true; this.selectBBox(bbox.id); });
+    rect.on("click tap", (e) => { e.cancelBubble = true; this._select(bbox.id); });
     rect.on("dragmove", () => {
       const lbl = this.labelByBBoxId.get(bbox.id);
       if (lbl) this._positionLabel(lbl, rect);
     });
     rect.on("dragend", () => {
-      this.commitRectGeometry(bbox.id, rect);
+      this._commitRectGeometry(bbox.id, rect);
       const lbl = this.labelByBBoxId.get(bbox.id);
       if (lbl) this._positionLabel(lbl, rect);
     });
@@ -236,7 +205,7 @@ export class BBoxAnnotationLayer {
       rect.height(Math.max(1, rect.height() * sy));
       rect.scaleX(1);
       rect.scaleY(1);
-      this.commitRectGeometry(bbox.id, rect);
+      this._commitRectGeometry(bbox.id, rect);
       const lbl = this.labelByBBoxId.get(bbox.id);
       if (lbl) this._positionLabel(lbl, rect);
     });
@@ -253,3 +222,8 @@ export class BBoxAnnotationLayer {
     return label;
   }
 }
+
+export const bboxRenderer2DFactory: AnnotationRenderer2DFactory = {
+  kind: "bbox",
+  create: (ctx: Scene2DContext) => new BBoxRenderer2D(ctx),
+};

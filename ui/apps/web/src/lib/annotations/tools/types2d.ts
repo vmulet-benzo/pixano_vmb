@@ -6,7 +6,7 @@ License: CECILL-C
 
 import type Konva from "konva";
 
-import type { AnnotationCollection } from "../annotationCollection.svelte.js";
+import type { AnnotationCollection, AnnotationKind } from "../annotationCollection.svelte.js";
 import type { BuildContext } from "../buildPayloads.js";
 import type { ResourceMutation } from "../types.js";
 import type { ToolDefinition } from "./toolDefinition.js";
@@ -47,12 +47,24 @@ export interface Scene2DContext {
   setActiveTool(id: string): void;
   /** Ask the widget to re-sync annotation rendering. */
   requestRedraw(): void;
-  /**
-   * Delete the selected annotation (queues the backend mutations).
-   * Temporary seam: moves into per-kind modules with the payload-builder
-   * registry (Phase 4).
-   */
-  deleteSelected(): void;
+}
+
+/**
+ * Displays one annotation kind on the 2D scene. Renderers are pure display
+ * plus per-node interaction (select, drag, transform); creation input lives
+ * in tools (docs/ARCHITECTURE.md, decision D4). One instance per widget.
+ */
+export interface AnnotationRenderer2D {
+  readonly kind: AnnotationKind;
+  /** Reconcile scene nodes with the collection. */
+  sync(): void;
+  destroy(): void;
+}
+
+/** Registry entry: builds a renderer bound to one widget's scene. */
+export interface AnnotationRenderer2DFactory {
+  readonly kind: AnnotationKind;
+  create(ctx: Scene2DContext): AnnotationRenderer2D;
 }
 
 /** Per-activation handler instance created by a tool for one widget. */
