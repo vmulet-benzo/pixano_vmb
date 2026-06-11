@@ -6,6 +6,8 @@ License: CECILL-C
 
 import { describe, expect, it, vi } from "vitest";
 
+import type { AnnotationCollection } from "$lib/annotations/annotationCollection.svelte.js";
+import type { CoordsNorm } from "$lib/annotations/types.js";
 import type { BBoxRow } from "$lib/api/annotations.js";
 import type { CalibratedImageResponse } from "$lib/api/restTypes.js";
 import type { DatasetGateway } from "$lib/workspace/datasetGateway.js";
@@ -58,6 +60,10 @@ function makeCtx(bboxes: BBoxRow[], viewName = "CAM_FRONT") {
   };
 }
 
+function seededAnnotations(seed: { storage?: Record<string, unknown> } | null) {
+  return (seed!.storage!.annotations as AnnotationCollection).items;
+}
+
 // ─── Tests ────────────────────────────────────────────────────────────────────
 
 describe("ImageExtension.addRecordSeed — bbox normalization", () => {
@@ -75,7 +81,7 @@ describe("ImageExtension.addRecordSeed — bbox normalization", () => {
     const seed = await ImageExtension.config.addRecordSeed!(makeCtx([bbox]));
 
     expect(seed).not.toBeNull();
-    const [x, y, w, h] = seed!.storage!.bboxes![0].coordsNorm;
+    const [x, y, w, h] = seededAnnotations(seed)[0].geometry as CoordsNorm;
     expect(x).toBeCloseTo(320 / 1600);
     expect(y).toBeCloseTo(180 / 900);
     expect(w).toBeCloseTo(160 / 1600);
@@ -95,7 +101,7 @@ describe("ImageExtension.addRecordSeed — bbox normalization", () => {
 
     const seed = await ImageExtension.config.addRecordSeed!(makeCtx([bbox]));
 
-    expect(seed!.storage!.bboxes![0].coordsNorm).toEqual([0.1, 0.2, 0.3, 0.4]);
+    expect(seededAnnotations(seed)[0].geometry).toEqual([0.1, 0.2, 0.3, 0.4]);
   });
 
   it("converts pixel-space xyxy to normalized xywh", async () => {
@@ -111,7 +117,7 @@ describe("ImageExtension.addRecordSeed — bbox normalization", () => {
 
     const seed = await ImageExtension.config.addRecordSeed!(makeCtx([bbox]));
 
-    const [x, y, w, h] = seed!.storage!.bboxes![0].coordsNorm;
+    const [x, y, w, h] = seededAnnotations(seed)[0].geometry as CoordsNorm;
     expect(x).toBeCloseTo(160 / 1600);
     expect(y).toBeCloseTo(90 / 900);
     expect(w).toBeCloseTo((480 - 160) / 1600);
@@ -131,7 +137,7 @@ describe("ImageExtension.addRecordSeed — bbox normalization", () => {
 
     const seed = await ImageExtension.config.addRecordSeed!(makeCtx([bbox]));
 
-    const [x, y, w, h] = seed!.storage!.bboxes![0].coordsNorm;
+    const [x, y, w, h] = seededAnnotations(seed)[0].geometry as CoordsNorm;
     expect(x).toBeCloseTo(0.1);
     expect(y).toBeCloseTo(0.2);
     expect(w).toBeCloseTo(0.3);
@@ -160,8 +166,8 @@ describe("ImageExtension.addRecordSeed — bbox normalization", () => {
 
     const seed = await ImageExtension.config.addRecordSeed!(makeCtx([matching, other]));
 
-    expect(seed!.storage!.bboxes).toHaveLength(1);
-    expect(seed!.storage!.bboxes![0].id).toBe("match");
+    expect(seededAnnotations(seed)).toHaveLength(1);
+    expect(seededAnnotations(seed)[0].id).toBe("match");
   });
 
   it("filters boxes by logical view name (legacy format)", async () => {
@@ -177,8 +183,8 @@ describe("ImageExtension.addRecordSeed — bbox normalization", () => {
 
     const seed = await ImageExtension.config.addRecordSeed!(makeCtx([matching]));
 
-    expect(seed!.storage!.bboxes).toHaveLength(1);
-    expect(seed!.storage!.bboxes![0].id).toBe("legacy");
+    expect(seededAnnotations(seed)).toHaveLength(1);
+    expect(seededAnnotations(seed)[0].id).toBe("legacy");
   });
 
   it("returns empty bboxes when no image is found for the view", async () => {
@@ -193,7 +199,7 @@ describe("ImageExtension.addRecordSeed — bbox normalization", () => {
 
     const seed = await ImageExtension.config.addRecordSeed!(ctx);
 
-    expect(seed!.storage!.bboxes).toHaveLength(0);
+    expect(seededAnnotations(seed)).toHaveLength(0);
   });
 
   it("returns null for non-Image view bases", async () => {

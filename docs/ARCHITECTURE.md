@@ -74,10 +74,15 @@ interface LocalAnnotation<G = unknown> {
   kind: AnnotationKind;     // "bbox" | "bbox3d" | "mask" | …
   geometry: G;              // per-kind shape, typed in the kind's module
   persisted: boolean;
-  draftGeometry?: G;        // optimistic unsaved edit (replaces overrides map)
   entity?: Record<string, unknown>;
 }
 ```
+
+> Amendment (Phase 1): the originally planned `draftGeometry` field was dropped.
+> Optimistic edits mutate `geometry` in place and the pending mutation queue is
+> the ledger of unsaved changes — exactly how the 2D widget already behaved.
+> The 3D `overrides` map becomes unnecessary once persisted boxes live in the
+> collection instead of immutable widget `data`.
 
 A single `AnnotationCollection` (`.svelte.ts` runes class) owns: the annotation
 list, selection, the persisted flip after a successful create, optimistic edits,

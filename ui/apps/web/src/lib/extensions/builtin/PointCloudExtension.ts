@@ -4,8 +4,12 @@ Author : pixano@cea.fr
 License: CECILL-C
 -------------------------------------*/
 
-import type { BBox3DRow, LocalBBox3D } from "$lib/api/annotations.js";
+import {
+  AnnotationCollection,
+  type LocalBBox3DAnnotation,
+} from "$lib/annotations/annotationCollection.svelte.js";
 import type { PointCloudWidgetStorage } from "$lib/annotations/types.js";
+import type { BBox3DRow } from "$lib/api/annotations.js";
 import PointCloudWidget from "$lib/components/widgets/point-cloud/PointCloudWidget.svelte";
 
 import { WidgetExtension } from "../WidgetExtension.js";
@@ -30,11 +34,10 @@ export const PointCloudExtension = WidgetExtension.create({
   }),
   addStorage: (): PointCloudWidgetStorage => ({
     mode: "navigate",
-    drafts: [],
-    overrides: {},
+    annotations: new AnnotationCollection(),
   }),
   findLocalDraft: (storage, localId) => {
-    return (storage as PointCloudWidgetStorage).drafts?.find((b) => b.id === localId);
+    return (storage as PointCloudWidgetStorage).annotations?.find(localId);
   },
   addRecordSeed: async ({ datasetId, recordId, viewName, viewDef, entitiesById, gateway }) => {
     if (!viewDef.base || !CLAIMED_BASES.has(viewDef.base)) return null;
@@ -57,15 +60,22 @@ export const PointCloudExtension = WidgetExtension.create({
 
     // Attach the parent entity (when one exists) so the scene can render a
     // label via `pickEntityLabel` without an extra fetch.
-    const bboxes3d: LocalBBox3D[] = bboxRows.map((b) => ({
-      ...b,
-      entity: b.entity_id ? entitiesById.get(b.entity_id) : undefined,
-    }));
+    const annotations = bboxRows.map(
+      (b): LocalBBox3DAnnotation => ({
+        id: b.id,
+        entityId: b.entity_id,
+        kind: "bbox3d",
+        geometry: { coords: b.coords, format: b.format, rotation: b.rotation },
+        persisted: true,
+        entity: b.entity_id ? entitiesById.get(b.entity_id) : undefined,
+      }),
+    );
 
     return {
       title: viewName,
       options: {},
-      data: { pointCloudUrl: pointCloud?.src, bboxes3d, datasetId, recordId, viewId: pointCloud?.id ?? "" },
+      data: { pointCloudUrl: pointCloud?.src, datasetId, recordId, viewId: pointCloud?.id ?? "" },
+      storage: { annotations: new AnnotationCollection(annotations) },
     };
   },
 });

@@ -107,7 +107,7 @@ License: CECILL-C
     if (e.key === "Escape") {
       if (drawPhaseRef?.isDrawing) drawPhaseRef.cancelDraft();
       else annotationRef?.selectBBox(null);
-    } else if ((e.key === "Delete" || e.key === "Backspace") && storage.selectedId) {
+    } else if ((e.key === "Delete" || e.key === "Backspace") && storage.annotations.selectedId) {
       const target = e.target as HTMLElement | null;
       if (target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable)) return;
       e.preventDefault();
@@ -206,12 +206,12 @@ License: CECILL-C
   });
 
   $effect(() => {
-    void storage.bboxes.length;
-    void storage.selectedId;
+    void storage.annotations.items.length;
+    void storage.annotations.selectedId;
     if (imageLoaded) annotationRef?.redrawBoxes();
   });
 
-  const hasSelection = $derived(storage.selectedId !== null);
+  const hasSelection = $derived(storage.annotations.selectedId !== null);
   const widgetPending = $derived(
     new Set(
       manager.pendingMutations
