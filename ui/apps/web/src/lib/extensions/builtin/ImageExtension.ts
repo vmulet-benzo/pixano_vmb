@@ -5,6 +5,7 @@ License: CECILL-C
 -------------------------------------*/
 
 import { AnnotationCollection, type LocalBBox } from "$lib/annotations/annotationCollection.svelte.js";
+import { DEFAULT_TOOL_2D } from "$lib/annotations/tools/types2d.js";
 import type {
   CameraCalibration,
   CoordsNorm,
@@ -53,7 +54,7 @@ export const ImageExtension = WidgetExtension.create<ImageWidgetOptions, ImageWi
     calibration: null,
   }),
   addStorage: () => ({
-    mode: "select",
+    activeToolId: DEFAULT_TOOL_2D,
     annotations: new AnnotationCollection(),
   }),
   findLocalDraft: (storage, localId) => {

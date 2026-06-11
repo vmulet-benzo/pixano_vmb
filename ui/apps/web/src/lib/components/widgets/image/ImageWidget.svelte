@@ -6,14 +6,15 @@ License: CECILL-C
 
 <script lang="ts">
   import Konva from "konva";
-  import { MousePointer2, Save, Square, Trash2 } from "lucide-svelte";
+  import { Save, Trash2 } from "lucide-svelte";
   import { getContext, onMount } from "svelte";
 
+  import { DEFAULT_TOOL_2D, getTool2D, TOOLS_2D } from "$lib/annotations/tools/registry2d.js";
+  import type { Scene2DContext, ToolHandler2D } from "$lib/annotations/tools/types2d.js";
   import type { ImageWidgetOptions, ImageWidgetStorage } from "$lib/annotations/types.js";
   import type { WorkspaceManager } from "$lib/workspace/workspaceManager.svelte.js";
 
   import { BBoxAnnotationLayer } from "./useBBoxAnnotationLayer.js";
-  import { BBoxDrawPhase } from "./useBBoxDrawPhase.js";
 
   interface Props {
     widgetId: string;
@@ -33,6 +34,7 @@ License: CECILL-C
   let containerEl = $state<HTMLDivElement>(null!);
   let imageLoaded = $state(false);
   let imageError = $state(false);
+  let sceneReady = $state(false);
 
   let stage: Konva.Stage | null = null;
   let imageLayer: Konva.Layer | null = null;
@@ -41,7 +43,8 @@ License: CECILL-C
   let placeholderShapes: Konva.Node[] = [];
 
   let annotationRef: BBoxAnnotationLayer | null = null;
-  let drawPhaseRef: BBoxDrawPhase | null = null;
+  let sceneContext: Scene2DContext | null = null;
+  let activeHandler: ToolHandler2D | null = null;
 
   function fitImageToStage() {
     if (!stage || !konvaImage || !loadedImg) return;
@@ -87,32 +90,10 @@ License: CECILL-C
     layer.draw();
   }
 
-  function onStageMouseDown(event: Konva.KonvaEventObject<MouseEvent>) {
-    if (storage.mode === "draw-bbox") {
-      drawPhaseRef?.beginDraw(event);
-      return;
-    }
-    if (event.target === stage) annotationRef?.selectBBox(null);
-  }
-
-  function onStageMouseMove() {
-    if (storage.mode === "draw-bbox" && drawPhaseRef?.isDrawing) drawPhaseRef.updateDraw();
-  }
-
-  function onStageMouseUp() {
-    if (storage.mode === "draw-bbox" && drawPhaseRef?.isDrawing) drawPhaseRef.endDrawFinalize();
-  }
-
   function onWindowKeyDown(e: KeyboardEvent) {
-    if (e.key === "Escape") {
-      if (drawPhaseRef?.isDrawing) drawPhaseRef.cancelDraft();
-      else annotationRef?.selectBBox(null);
-    } else if ((e.key === "Delete" || e.key === "Backspace") && storage.annotations.selectedId) {
-      const target = e.target as HTMLElement | null;
-      if (target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable)) return;
-      e.preventDefault();
-      annotationRef?.deleteSelected();
-    }
+    const target = e.target as HTMLElement | null;
+    if (target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable)) return;
+    if (activeHandler?.onKeyDown?.(e)) e.preventDefault();
   }
 
   onMount(() => {
@@ -133,20 +114,35 @@ License: CECILL-C
       stableWidgetId,
       imgOptions,
     );
-    drawPhaseRef = new BBoxDrawPhase(
-      annotationLayer,
-      stage,
-      storage,
-      manager,
-      stableWidgetId,
-      imgOptions,
-      () => konvaImage,
-      () => annotationRef?.redrawBoxes(),
-    );
 
-    stage.on("mousedown touchstart", onStageMouseDown);
-    stage.on("mousemove touchmove", onStageMouseMove);
-    stage.on("mouseup touchend", onStageMouseUp);
+    sceneContext = {
+      widgetId: stableWidgetId,
+      buildContext: {
+        datasetId: imgOptions.datasetId,
+        recordId: imgOptions.recordId,
+        viewId: imgOptions.viewId,
+      },
+      collection: storage.annotations,
+      mutations: {
+        get pending() {
+          return manager.pendingMutations;
+        },
+        queue: (m) => manager.queueMutation(m),
+        dropForLocalAnnotation: (id) => void manager.dropMutationsForLocalAnnotation(id),
+      },
+      stage,
+      annotationLayer,
+      getKonvaImage: () => konvaImage,
+      setActiveTool: (id) => {
+        storage.activeToolId = id;
+      },
+      requestRedraw: () => annotationRef?.redrawBoxes(),
+      deleteSelected: () => annotationRef?.deleteSelected(),
+    };
+
+    stage.on("mousedown touchstart", (e) => activeHandler?.onPointerDown?.(e));
+    stage.on("mousemove touchmove", (e) => activeHandler?.onPointerMove?.(e));
+    stage.on("mouseup touchend", (e) => activeHandler?.onPointerUp?.(e));
 
     const imageUrl = data?.imageUrl as string | undefined;
     if (imageUrl) {
@@ -184,13 +180,17 @@ License: CECILL-C
 
     resizeObserver.observe(containerEl);
     window.addEventListener("keydown", onWindowKeyDown);
+    sceneReady = true;
 
     return () => {
       resizeObserver.disconnect();
       window.removeEventListener("keydown", onWindowKeyDown);
+      activeHandler?.deactivate?.();
+      activeHandler = null;
+      sceneContext = null;
+      sceneReady = false;
       annotationRef?.destroy();
       annotationRef = null;
-      drawPhaseRef = null;
       stage?.destroy();
       stage = null;
       imageLayer = null;
@@ -200,9 +200,15 @@ License: CECILL-C
     };
   });
 
+  // Swap the active tool handler whenever the widget's tool changes.
   $effect(() => {
-    if (!containerEl) return;
-    containerEl.style.cursor = storage.mode === "draw-bbox" ? "crosshair" : "default";
+    const toolId = storage.activeToolId;
+    if (!sceneReady || !sceneContext) return;
+    activeHandler?.deactivate?.();
+    const tool = getTool2D(toolId) ?? getTool2D(DEFAULT_TOOL_2D)!;
+    activeHandler = tool.createHandler(sceneContext);
+    activeHandler.activate?.();
+    if (containerEl) containerEl.style.cursor = tool.cursor ?? "default";
   });
 
   $effect(() => {
@@ -228,26 +234,20 @@ License: CECILL-C
     onpointerdown={(e) => e.stopPropagation()}
     aria-label="Image annotation tools"
   >
-    <button
-      type="button"
-      onclick={() => (storage.mode = "select")}
-      title="Select / move (V)"
-      class="rounded p-1 text-muted-foreground hover:bg-accent hover:text-accent-foreground {storage.mode === 'select' ? 'bg-accent text-accent-foreground' : ''}"
-    >
-      <MousePointer2 class="h-3.5 w-3.5" />
-    </button>
-    <button
-      type="button"
-      onclick={() => (storage.mode = storage.mode === "draw-bbox" ? "select" : "draw-bbox")}
-      title="Add box annotation (R)"
-      class="rounded p-1 text-muted-foreground hover:bg-accent hover:text-accent-foreground {storage.mode === 'draw-bbox' ? 'bg-accent text-accent-foreground' : ''}"
-    >
-      <Square class="h-3.5 w-3.5" />
-    </button>
+    {#each TOOLS_2D as tool (tool.id)}
+      <button
+        type="button"
+        onclick={() => (storage.activeToolId = storage.activeToolId === tool.id ? DEFAULT_TOOL_2D : tool.id)}
+        title={tool.label}
+        class="rounded p-1 text-muted-foreground hover:bg-accent hover:text-accent-foreground {storage.activeToolId === tool.id ? 'bg-accent text-accent-foreground' : ''}"
+      >
+        <tool.icon class="h-3.5 w-3.5" />
+      </button>
+    {/each}
     <span class="mx-1 h-4 w-px bg-border"></span>
     <button
       type="button"
-      onclick={() => annotationRef?.deleteSelected()}
+      onclick={() => sceneContext?.deleteSelected()}
       disabled={!hasSelection}
       title="Delete selected (Del)"
       class="rounded p-1 text-muted-foreground hover:bg-destructive/20 hover:text-destructive disabled:opacity-40"
