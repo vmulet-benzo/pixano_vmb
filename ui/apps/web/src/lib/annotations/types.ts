@@ -73,7 +73,8 @@ export interface ImageWidgetOptions {
  * state (list, selection, lifecycle) lives in the collection.
  */
 export interface ImageWidgetStorage {
-  mode: "select" | "draw-bbox";
+  /** Id of the active tool from the 2D tool registry. */
+  activeToolId: string;
   annotations: AnnotationCollection;
   [key: string]: unknown;
 }
