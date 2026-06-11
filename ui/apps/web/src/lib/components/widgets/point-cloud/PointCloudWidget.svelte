@@ -5,7 +5,7 @@ License: CECILL-C
 -------------------------------------->
 
 <script lang="ts">
-  import { Box, Eye, Globe, Move, MousePointer2, Orbit, Save, Scaling } from "lucide-svelte";
+  import { Eye, Globe, Move, Orbit, Save, Scaling } from "lucide-svelte";
   import { getContext, onMount } from "svelte";
   import type { Component } from "svelte";
 
@@ -19,11 +19,12 @@ License: CECILL-C
     DEFAULT_3D_ROTATION,
     generateShortId,
   } from "$lib/annotations/buildPayloads.js";
+  import { DEFAULT_TOOL_3D, TOOLS_3D } from "$lib/annotations/tools/registry3d.js";
   import type { PointCloudWidgetStorage } from "$lib/annotations/types.js";
   import type { LocalBBox3D } from "$lib/api/annotations.js";
   import type { WorkspaceManager } from "$lib/workspace/workspaceManager.svelte.js";
 
-  import type { GizmoVisibility } from "./pointCloudTypes.js";
+  import type { GizmoVisibility } from "$lib/annotations/kinds/3d/bbox3d/bbox3dTypes.js";
 
   interface Props {
     widgetId: string;
@@ -83,7 +84,8 @@ License: CECILL-C
 
   $effect(() => {
     if (!canvasEl) return;
-    canvasEl.style.cursor = storage.mode === "draw-bbox3d" ? "crosshair" : "default";
+    const tool = TOOLS_3D.find((t) => t.id === storage.activeToolId);
+    canvasEl.style.cursor = tool?.cursor ?? "default";
   });
 
   function handleReadyToConfirm(
@@ -220,22 +222,16 @@ License: CECILL-C
     aria-label="Point cloud tools"
     tabindex="0"
   >
-    <button
-      type="button"
-      onclick={() => (storage.mode = "navigate")}
-      title="Navigate"
-      class="rounded p-1 text-muted-foreground hover:bg-accent hover:text-accent-foreground {storage.mode === 'navigate' ? 'bg-accent text-accent-foreground' : ''}"
-    >
-      <MousePointer2 class="h-3.5 w-3.5" />
-    </button>
-    <button
-      type="button"
-      onclick={() => (storage.mode = storage.mode === "draw-bbox3d" ? "navigate" : "draw-bbox3d")}
-      title="Draw 3D box"
-      class="rounded p-1 text-muted-foreground hover:bg-accent hover:text-accent-foreground {storage.mode === 'draw-bbox3d' ? 'bg-accent text-accent-foreground' : ''}"
-    >
-      <Box class="h-3.5 w-3.5" />
-    </button>
+    {#each TOOLS_3D as tool (tool.id)}
+      <button
+        type="button"
+        onclick={() => (storage.activeToolId = storage.activeToolId === tool.id ? DEFAULT_TOOL_3D : tool.id)}
+        title={tool.label}
+        class="rounded p-1 text-muted-foreground hover:bg-accent hover:text-accent-foreground {storage.activeToolId === tool.id ? 'bg-accent text-accent-foreground' : ''}"
+      >
+        <tool.icon class="h-3.5 w-3.5" />
+      </button>
+    {/each}
     <div class="mx-1 h-4 w-px bg-border"></div>
     <button
       type="button"
@@ -287,7 +283,7 @@ License: CECILL-C
             bind:this={sceneRef}
             pointCloudUrl={data?.pointCloudUrl as string | undefined}
             bboxes3d={allBboxes3d}
-            drawMode={storage.mode === "draw-bbox3d"}
+            activeToolId={storage.activeToolId}
             {cameraMode}
             onReadyToConfirm={handleReadyToConfirm}
             onDrawCanceled={handleDrawCanceled}

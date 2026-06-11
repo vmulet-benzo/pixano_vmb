@@ -8,6 +8,7 @@ import {
   AnnotationCollection,
   type LocalBBox3DAnnotation,
 } from "$lib/annotations/annotationCollection.svelte.js";
+import { DEFAULT_TOOL_3D } from "$lib/annotations/tools/types3d.js";
 import type { PointCloudWidgetStorage } from "$lib/annotations/types.js";
 import type { BBox3DRow } from "$lib/api/annotations.js";
 import PointCloudWidget from "$lib/components/widgets/point-cloud/PointCloudWidget.svelte";
@@ -33,7 +34,7 @@ export const PointCloudExtension = WidgetExtension.create({
     logicalName: "",
   }),
   addStorage: (): PointCloudWidgetStorage => ({
-    mode: "navigate",
+    activeToolId: DEFAULT_TOOL_3D,
     annotations: new AnnotationCollection(),
   }),
   findLocalDraft: (storage, localId) => {
