@@ -4,12 +4,12 @@ Author : pixano@cea.fr
 License: CECILL-C
 -------------------------------------*/
 
+import { AnnotationCollection, type LocalBBox } from "$lib/annotations/annotationCollection.svelte.js";
 import type {
   CameraCalibration,
   CoordsNorm,
   ImageWidgetOptions,
   ImageWidgetStorage,
-  LocalBBox,
 } from "$lib/annotations/types.js";
 import type { BBoxRow } from "$lib/api/annotations.js";
 import type { CalibratedImageResponse } from "$lib/api/restTypes.js";
@@ -54,11 +54,10 @@ export const ImageExtension = WidgetExtension.create<ImageWidgetOptions, ImageWi
   }),
   addStorage: () => ({
     mode: "select",
-    selectedId: null,
-    bboxes: [],
+    annotations: new AnnotationCollection(),
   }),
   findLocalDraft: (storage, localId) => {
-    return (storage as ImageWidgetStorage).bboxes?.find((b) => b.id === localId);
+    return (storage as ImageWidgetStorage).annotations?.find(localId);
   },
   addRecordSeed: async ({ datasetId, recordId, viewName, viewDef, entitiesById, gateway }) => {
     if (!viewDef.base || !CLAIMED_BASES.has(viewDef.base)) return null;
@@ -98,7 +97,8 @@ export const ImageExtension = WidgetExtension.create<ImageWidgetOptions, ImageWi
         return {
           id: b.id,
           entityId: b.entity_id,
-          coordsNorm,
+          kind: "bbox",
+          geometry: coordsNorm,
           persisted: true,
           entity: entitiesById.get(b.entity_id),
         };
@@ -116,7 +116,7 @@ export const ImageExtension = WidgetExtension.create<ImageWidgetOptions, ImageWi
         calibration: _extractCalibration(image),
       },
       data: { imageUrl: image?.src },
-      storage: { bboxes: seedBBoxes },
+      storage: { annotations: new AnnotationCollection(seedBBoxes) },
     };
   },
 });

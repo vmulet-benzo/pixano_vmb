@@ -9,16 +9,17 @@ License: CECILL-C
   import { getContext, onMount } from "svelte";
   import type { Component } from "svelte";
 
+  import type {
+    BBox3DGeometry,
+    LocalBBox3DAnnotation,
+  } from "$lib/annotations/annotationCollection.svelte.js";
   import {
     buildBBox3DCreate,
     buildBBox3DUpdate,
     DEFAULT_3D_ROTATION,
     generateShortId,
   } from "$lib/annotations/buildPayloads.js";
-  import type {
-    DraftBBox3D,
-    PointCloudWidgetStorage,
-  } from "$lib/annotations/types.js";
+  import type { PointCloudWidgetStorage } from "$lib/annotations/types.js";
   import type { LocalBBox3D } from "$lib/api/annotations.js";
   import type { WorkspaceManager } from "$lib/workspace/workspaceManager.svelte.js";
 
@@ -47,8 +48,6 @@ License: CECILL-C
   let cameraMode = $state<"orbit" | "first-person">("orbit");
 
   let confirmEditingId = $state<string | null>(null);
-  // Clear persisted-box overrides when the record changes so stale edits don't bleed across records.
-  $effect(() => { void data; storage.overrides = {}; });
 
   let ready = $state(false);
   let error = $state<string | null>(null);
@@ -123,37 +122,47 @@ License: CECILL-C
     coords: [number, number, number, number, number, number],
     rotation: number[] | undefined,
   ): void {
-    const existing = allBboxes3d.find((b) => b.id === boxId);
-    if (!existing) return;
+    const annotation = storage.annotations.find(boxId);
+    if (!annotation) return;
 
-    const updateBody = buildBBox3DUpdate(
-      { datasetId, recordId, viewId },
-      boxId,
-      existing.entity_id,
-      coords,
-      rotation,
-    );
-    const pending = manager.pendingMutations.find(
-      (m) => m.op === "update" && m.resource === "bbox3ds" && m.id === boxId,
-    );
-    if (pending && pending.op === "update") {
-      pending.body = updateBody;
+    if (annotation.persisted) {
+      const updateBody = buildBBox3DUpdate(
+        { datasetId, recordId, viewId },
+        boxId,
+        annotation.entityId,
+        coords,
+        rotation,
+      );
+      const pending = manager.pendingMutations.find(
+        (m) => m.op === "update" && m.resource === "bbox3ds" && m.id === boxId,
+      );
+      if (pending && pending.op === "update") {
+        pending.body = updateBody;
+      } else {
+        manager.queueMutation({
+          op: "update",
+          resource: "bbox3ds",
+          id: boxId,
+          body: updateBody,
+          widgetId: stableWidgetId,
+          localAnnotationId: boxId,
+        });
+      }
     } else {
-      manager.queueMutation({
-        op: "update",
-        resource: "bbox3ds",
-        id: boxId,
-        body: updateBody,
-        widgetId: stableWidgetId,
-        localAnnotationId: boxId,
-      });
+      const pending = manager.pendingMutations.find(
+        (m) =>
+          m.op === "create" &&
+          m.resource === "bbox3ds" &&
+          m.widgetId === stableWidgetId &&
+          m.localAnnotationId === boxId,
+      );
+      if (pending && pending.op === "create") {
+        pending.body.coords = Array.from(coords);
+        pending.body.rotation = rotation ?? DEFAULT_3D_ROTATION;
+      }
     }
-    const draftIdx = storage.drafts.findIndex((d) => d.id === boxId);
-    if (draftIdx >= 0) {
-      storage.drafts[draftIdx] = { ...storage.drafts[draftIdx], coordsLance: coords, rotation };
-    } else {
-      storage.overrides[boxId] = { coords, rotation };
-    }
+    const geometry: BBox3DGeometry = { coords, format: "xyzwhd", rotation };
+    storage.annotations.setGeometry(boxId, geometry);
   }
 
   function handleNewBoxSave(
@@ -166,14 +175,14 @@ License: CECILL-C
       coords,
       { widgetId: stableWidgetId, localAnnotationId: localId, rotation },
     );
-    const draft: DraftBBox3D = {
+    const draft: LocalBBox3DAnnotation = {
       id: localId,
       entityId,
-      coordsLance: coords,
-      rotation,
+      kind: "bbox3d",
+      geometry: { coords, format: "xyzwhd", rotation },
       persisted: false,
     };
-    storage.drafts.push(draft);
+    storage.annotations.add(draft);
     for (const m of mutations) {
       manager.queueMutation(m);
     }
@@ -185,26 +194,21 @@ License: CECILL-C
     sceneRef?.reset();
   }
 
-  const allBboxes3d = $derived<LocalBBox3D[]>([
-    ...((data?.bboxes3d as LocalBBox3D[] | undefined) ?? []).map((bbox) => {
-      const ov = storage.overrides[bbox.id];
-      if (!ov) return bbox;
-      return { ...bbox, coords: ov.coords, rotation: ov.rotation ?? bbox.rotation };
-    }),
-    ...storage.drafts.map(
-      (d): LocalBBox3D => ({
-        id: d.id,
+  const allBboxes3d = $derived<LocalBBox3D[]>(
+    storage.annotations.byKind<BBox3DGeometry>("bbox3d").map(
+      (a): LocalBBox3D => ({
+        id: a.id,
         record_id: recordId,
-        entity_id: d.entityId,
+        entity_id: a.entityId,
         view_id: viewId,
-        coords: d.coordsLance,
-        format: "xyzwhd",
-        rotation: d.rotation ?? DEFAULT_3D_ROTATION,
+        coords: a.geometry.coords,
+        format: a.geometry.format,
+        rotation: a.geometry.rotation ?? DEFAULT_3D_ROTATION,
         is_normalized: false,
-        entity: d.entity,
+        entity: a.entity,
       }),
     ),
-  ]);
+  );
 </script>
 
 <div class="relative flex h-full w-full flex-col bg-card">

@@ -6,8 +6,9 @@ License: CECILL-C
 
 import Konva from "konva";
 
+import type { LocalBBox } from "$lib/annotations/annotationCollection.svelte.js";
 import { buildBBoxUpdate } from "$lib/annotations/buildPayloads.js";
-import type { ImageWidgetOptions, ImageWidgetStorage, LocalBBox } from "$lib/annotations/types.js";
+import type { CoordsNorm, ImageWidgetOptions, ImageWidgetStorage } from "$lib/annotations/types.js";
 import { pickEntityLabel } from "$lib/annotations/types.js";
 import type { WorkspaceManager } from "$lib/workspace/workspaceManager.svelte.js";
 
@@ -48,7 +49,7 @@ export class BBoxAnnotationLayer {
     const frame = getPixelFrame(this.getKonvaImage());
     const activeIds = new Set<string>();
 
-    for (const bbox of this.storage.bboxes) {
+    for (const bbox of this.storage.annotations.byKind<CoordsNorm>("bbox")) {
       activeIds.add(bbox.id);
       let rect = this.rectByBBoxId.get(bbox.id);
       if (!rect) {
@@ -58,7 +59,7 @@ export class BBoxAnnotationLayer {
         this.rectByBBoxId.set(bbox.id, newRect);
         rect = newRect;
       } else if (frame) {
-        const pixel = normalizedToPixel(bbox.coordsNorm, frame);
+        const pixel = normalizedToPixel(bbox.geometry, frame);
         rect.position({ x: pixel.x, y: pixel.y });
         rect.width(pixel.width);
         rect.height(pixel.height);
@@ -89,7 +90,7 @@ export class BBoxAnnotationLayer {
   }
 
   syncTransformer(): void {
-    const id = this.storage.selectedId;
+    const id = this.storage.annotations.selectedId;
     if (!id) {
       this.transformer.nodes([]);
       this.transformer.getLayer()?.batchDraw();
@@ -106,7 +107,7 @@ export class BBoxAnnotationLayer {
   }
 
   selectBBox(id: string | null): void {
-    this.storage.selectedId = id;
+    this.storage.annotations.select(id);
     this.syncTransformer();
   }
 
@@ -114,11 +115,11 @@ export class BBoxAnnotationLayer {
     const frame = getPixelFrame(this.getKonvaImage());
     if (!frame || frame.w <= 0 || frame.h <= 0) return;
 
-    const bbox = this.storage.bboxes.find((b) => b.id === bboxId);
+    const bbox = this.storage.annotations.find(bboxId);
     if (!bbox) return;
 
     const coordsNorm = pixelToNormalized(rect.x(), rect.y(), rect.width(), rect.height(), frame);
-    bbox.coordsNorm = coordsNorm;
+    this.storage.annotations.setGeometry(bboxId, coordsNorm);
 
     if (bbox.persisted) {
       const ctx = {
@@ -157,9 +158,9 @@ export class BBoxAnnotationLayer {
   }
 
   deleteSelected(): void {
-    const id = this.storage.selectedId;
+    const id = this.storage.annotations.selectedId;
     if (!id) return;
-    const bbox = this.storage.bboxes.find((b) => b.id === id);
+    const bbox = this.storage.annotations.find(id);
     if (!bbox) return;
 
     if (bbox.persisted) {
@@ -181,8 +182,7 @@ export class BBoxAnnotationLayer {
       this.manager.dropMutationsForLocalAnnotation(bbox.id);
     }
 
-    this.storage.bboxes = this.storage.bboxes.filter((b) => b.id !== bbox.id);
-    this.storage.selectedId = null;
+    this.storage.annotations.remove(bbox.id);
     this.redrawBoxes();
   }
 
@@ -201,7 +201,7 @@ export class BBoxAnnotationLayer {
 
   private _makeRect(bbox: LocalBBox, frame: PixelFrame | null): Konva.Rect | null {
     if (!frame) return null;
-    const pixel = normalizedToPixel(bbox.coordsNorm, frame);
+    const pixel = normalizedToPixel(bbox.geometry, frame);
     const stroke = bbox.persisted ? BBOX_COLOR_PERSISTED : BBOX_COLOR_DRAFT;
     const rect = new Konva.Rect({
       x: pixel.x,

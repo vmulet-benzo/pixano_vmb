@@ -6,11 +6,11 @@ License: CECILL-C
 
 import Konva from "konva";
 
+import type { LocalBBox } from "$lib/annotations/annotationCollection.svelte.js";
 import { buildBBoxCreate, generateShortId } from "$lib/annotations/buildPayloads.js";
 import type {
   ImageWidgetOptions,
   ImageWidgetStorage,
-  LocalBBox,
   ResourceMutation,
 } from "$lib/annotations/types.js";
 import type { WorkspaceManager } from "$lib/workspace/workspaceManager.svelte.js";
@@ -120,8 +120,8 @@ export class BBoxDrawPhase {
     );
     void entityId;
 
-    const bbox: LocalBBox = { id: localId, entityId, coordsNorm, persisted: false };
-    this.storage.bboxes.push(bbox);
+    const bbox: LocalBBox = { id: localId, entityId, kind: "bbox", geometry: coordsNorm, persisted: false };
+    this.storage.annotations.add(bbox);
 
     for (const m of mutations) {
       if (m.op === "create" && m.resource === "bboxes") {
@@ -131,7 +131,7 @@ export class BBoxDrawPhase {
     }
 
     this.storage.mode = "select";
-    this.storage.selectedId = localId;
+    this.storage.annotations.select(localId);
     this.onFinalized();
   }
 
