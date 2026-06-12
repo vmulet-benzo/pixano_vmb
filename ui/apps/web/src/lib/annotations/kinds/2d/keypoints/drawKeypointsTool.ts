@@ -82,6 +82,7 @@ class DrawKeypointsHandler implements ToolHandler2D {
       id: generateShortId(),
       entityId: generateShortId(),
       kind: "keypoints",
+      viewId: this.ctx.buildContext.viewId,
       geometry: { points: this.points },
       persisted: false,
     };

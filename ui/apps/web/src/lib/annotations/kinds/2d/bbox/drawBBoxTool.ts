@@ -104,6 +104,7 @@ class DrawBBoxHandler implements ToolHandler2D {
       id: generateShortId(),
       entityId: generateShortId(),
       kind: "bbox",
+      viewId: this.ctx.buildContext.viewId,
       geometry: coordsNorm,
       persisted: false,
     };

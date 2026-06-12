@@ -19,6 +19,7 @@ const BBOX: LocalBBox = {
   id: "ann-1",
   entityId: "ent-1",
   kind: "bbox",
+  viewId: "view",
   geometry: [0.1, 0.2, 0.3, 0.4],
   persisted: false,
 };
@@ -27,6 +28,7 @@ const BBOX3D: LocalBBox3DAnnotation = {
   id: "ann-3d",
   entityId: "ent-3d",
   kind: "bbox3d",
+  viewId: "",
   geometry: { coords: [1, 2, 3, 4, 5, 6], format: "xyzwhd", rotation: [1, 0, 0, 0, 1, 0, 0, 0, 1] },
   persisted: false,
 };
@@ -35,6 +37,7 @@ const KEYPOINTS: LocalKeypoints = {
   id: "ann-kp",
   entityId: "ent-kp",
   kind: "keypoints",
+  viewId: "view",
   geometry: { points: [{ x: 0.1, y: 0.2 }, { x: 0.3, y: 0.4 }] },
   persisted: false,
 };

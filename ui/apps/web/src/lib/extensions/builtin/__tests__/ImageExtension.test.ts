@@ -6,7 +6,7 @@ License: CECILL-C
 
 import { describe, expect, it, vi } from "vitest";
 
-import type { AnnotationCollection } from "$lib/annotations/annotationCollection.svelte.js";
+import type { LocalAnnotation } from "$lib/annotations/annotationCollection.svelte.js";
 import type { CoordsNorm } from "$lib/annotations/types.js";
 import type { BBoxRow } from "$lib/api/annotations.js";
 import type { CalibratedImageResponse } from "$lib/api/restTypes.js";
@@ -61,8 +61,8 @@ function makeCtx(bboxes: BBoxRow[], viewName = "CAM_FRONT") {
   };
 }
 
-function seededAnnotations(seed: { storage?: Record<string, unknown> } | null) {
-  return (seed!.storage!.annotations as AnnotationCollection).items;
+function seededAnnotations(seed: { annotations?: LocalAnnotation[] } | null) {
+  return seed!.annotations!;
 }
 
 // ─── Tests ────────────────────────────────────────────────────────────────────

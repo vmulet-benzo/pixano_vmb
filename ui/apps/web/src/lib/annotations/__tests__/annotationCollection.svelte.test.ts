@@ -8,12 +8,13 @@ import { describe, expect, it } from "vitest";
 
 import {
   AnnotationCollection,
+  ViewScopedAnnotations,
   type LocalAnnotation,
   type LocalBBox,
 } from "../annotationCollection.svelte.js";
 
 function makeBBox(id: string, persisted = false): LocalBBox {
-  return { id, entityId: `e-${id}`, kind: "bbox", geometry: [0.1, 0.1, 0.2, 0.2], persisted };
+  return { id, entityId: `e-${id}`, kind: "bbox", viewId: "view-1", geometry: [0.1, 0.1, 0.2, 0.2], persisted };
 }
 
 function makeBBox3D(id: string): LocalAnnotation {
@@ -21,6 +22,7 @@ function makeBBox3D(id: string): LocalAnnotation {
     id,
     entityId: `e-${id}`,
     kind: "bbox3d",
+    viewId: "",
     geometry: { coords: [0, 0, 0, 1, 1, 1], format: "xyzwhd" },
     persisted: true,
   };
@@ -80,5 +82,51 @@ describe("AnnotationCollection", () => {
     const collection = new AnnotationCollection([makeBBox("a", false)]);
     collection.markPersisted("a");
     expect(collection.find("a")?.persisted).toBe(true);
+  });
+});
+
+describe("ViewScopedAnnotations", () => {
+  function makeShared() {
+    const otherViewBBox: LocalBBox = { ...makeBBox("other"), viewId: "view-2" };
+    const shared = new AnnotationCollection([makeBBox("a"), otherViewBBox, makeBBox3D("box3d")]);
+    const view1 = new ViewScopedAnnotations(() => shared, "view-1");
+    return { shared, view1 };
+  }
+
+  it("shows this view's annotations plus record-scoped kinds, hides other views", () => {
+    const { view1 } = makeShared();
+    expect(view1.items.map((a) => a.id)).toEqual(["a", "box3d"]);
+    expect(view1.find("other")).toBeUndefined();
+    expect(view1.byKind("bbox3d").map((a) => a.id)).toEqual(["box3d"]);
+    expect(view1.count).toBe(2);
+  });
+
+  it("writes through to the shared collection so other widgets see them", () => {
+    const { shared, view1 } = makeShared();
+
+    view1.setGeometry("box3d", { coords: [9, 9, 9, 1, 1, 1], format: "xyzwhd" });
+    expect((shared.find("box3d")?.geometry as { coords: number[] }).coords).toEqual([9, 9, 9, 1, 1, 1]);
+
+    view1.add({ ...makeBBox("new"), viewId: "view-1" });
+    expect(shared.find("new")).toBeDefined();
+
+    view1.remove("a");
+    expect(shared.find("a")).toBeUndefined();
+  });
+
+  it("shares the selection with the parent collection", () => {
+    const { shared, view1 } = makeShared();
+    view1.select("box3d");
+    expect(shared.selectedId).toBe("box3d");
+    expect(view1.selected?.id).toBe("box3d");
+  });
+
+  it("follows the parent getter when the session replaces the collection", () => {
+    let current = new AnnotationCollection([makeBBox("a")]);
+    const view = new ViewScopedAnnotations(() => current, "view-1");
+    expect(view.count).toBe(1);
+
+    current = new AnnotationCollection();
+    expect(view.count).toBe(0);
   });
 });

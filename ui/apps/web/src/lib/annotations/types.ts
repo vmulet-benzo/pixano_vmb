@@ -4,8 +4,6 @@ Author : pixano@cea.fr
 License: CECILL-C
 -------------------------------------*/
 
-import type { AnnotationCollection } from "./annotationCollection.svelte.js";
-
 /**
  * Normalized xywh coordinates on the image (values in [0, 1]).
  * Mirrors pixano's BBoxData.coords shape.
@@ -69,13 +67,13 @@ export interface ImageWidgetOptions {
 
 /**
  * Mutable per-instance storage for the image widget (managed via addStorage).
- * Lives in WorkspaceManager.storageMap, keyed by widget id. All annotation
- * state (list, selection, lifecycle) lives in the collection.
+ * Lives in WorkspaceManager.storageMap, keyed by widget id. Annotation state
+ * is NOT here — it lives on the record's shared collection
+ * (`WorkspaceSession.annotations`); storage holds genuinely per-widget state.
  */
 export interface ImageWidgetStorage {
   /** Id of the active tool from the 2D tool registry. */
   activeToolId: string;
-  annotations: AnnotationCollection;
   [key: string]: unknown;
 }
 
@@ -85,7 +83,6 @@ export interface ImageWidgetStorage {
 export interface PointCloudWidgetStorage {
   /** Id of the active tool from the 3D tool registry. */
   activeToolId: string;
-  annotations: AnnotationCollection;
   [key: string]: unknown;
 }
 

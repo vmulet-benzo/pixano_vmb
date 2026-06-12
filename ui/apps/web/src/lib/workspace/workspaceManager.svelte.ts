@@ -4,6 +4,7 @@ Author : pixano@cea.fr
 License: CECILL-C
 -------------------------------------*/
 
+import type { AnnotationCollection } from "$lib/annotations/annotationCollection.svelte.js";
 import type { ResourceMutation } from "$lib/annotations/types.js";
 import type { EntityRow } from "$lib/api/annotations.js";
 import type { WidgetInstance, WidgetLayout, WorkspacePreset } from "$lib/extensions/types.js";
@@ -53,17 +54,10 @@ export class WorkspaceManager {
     this.registry = registry;
     this.session = new WorkspaceSession();
 
-    // Each extension owns the knowledge of its own storage shape via findLocalDraft.
-    // The manager delegates rather than enumerating widget-type-specific fields.
+    // Annotations are record-scoped: the queue flips `persisted` directly on
+    // the session's shared collection, no per-widget storage lookup needed.
     this.mutations = new MutationQueue(gateway, this.session, {
-      findLocalAnnotation: (widgetId, localAnnotationId) => {
-        const storage = this.storageMap.get(widgetId);
-        if (!storage) return undefined;
-        const widget = this.widgets.find((w) => w.id === widgetId);
-        if (!widget) return undefined;
-        const config = this.registry.get(widget.extensionName);
-        return config?.findLocalDraft?.(storage, localAnnotationId);
-      },
+      findLocalAnnotation: (localAnnotationId) => this.session.annotations.find(localAnnotationId),
     });
 
     this.loader = new RecordLoader({
@@ -93,6 +87,11 @@ export class WorkspaceManager {
 
   get entitySchemaName(): string | null {
     return this.session.entitySchemaName;
+  }
+
+  /** Shared annotations of the loaded record (one collection per record). */
+  get annotations(): AnnotationCollection {
+    return this.session.annotations;
   }
 
   // ─── Mutation queue forwarders ────────────────────────────────────────────

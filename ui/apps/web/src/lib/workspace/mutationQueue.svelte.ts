@@ -14,19 +14,14 @@ import type { WorkspaceSession } from "./workspaceSession.svelte.js";
 
 /**
  * Lookup the queue uses to mark a local annotation as persisted after a
- * successful create. The queue stays widget-storage-agnostic; the wiring
- * code that constructs the queue supplies a closure that knows where to
- * look.
+ * successful create. Annotations live on the record's shared collection,
+ * so the lookup needs only the local annotation id.
  *
- * Returning `undefined` is fine — it just means the storage was already
- * cleared (e.g. user navigated away mid-flush) and the persistence flag
- * doesn't need flipping.
+ * Returning `undefined` is fine — it just means the record was switched
+ * mid-flush and the persistence flag doesn't need flipping.
  */
 export interface LocalAnnotationLocator {
-  findLocalAnnotation(
-    widgetId: string,
-    localAnnotationId: string,
-  ): { persisted: boolean } | undefined;
+  findLocalAnnotation(localAnnotationId: string): { persisted: boolean } | undefined;
 }
 
 /**
@@ -109,14 +104,10 @@ export class MutationQueue {
         if (
           mutation.op === "create" &&
           mutation.resource !== ENTITY_RESOURCE &&
-          mutation.widgetId &&
           mutation.localAnnotationId
         ) {
-          const bbox = this.locator.findLocalAnnotation(
-            mutation.widgetId,
-            mutation.localAnnotationId,
-          );
-          if (bbox) bbox.persisted = true;
+          const annotation = this.locator.findLocalAnnotation(mutation.localAnnotationId);
+          if (annotation) annotation.persisted = true;
         }
       }
     } catch (err) {

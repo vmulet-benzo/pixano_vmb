@@ -4,6 +4,10 @@ Author : pixano@cea.fr
 License: CECILL-C
 -------------------------------------*/
 
+import {
+  AnnotationCollection,
+  type LocalAnnotation,
+} from "$lib/annotations/annotationCollection.svelte.js";
 import type { EntityRow } from "$lib/api/annotations.js";
 import type { WidgetInstance } from "$lib/extensions/types.js";
 import type { WidgetRegistry } from "$lib/extensions/WidgetRegistry.js";
@@ -80,6 +84,7 @@ export class RecordLoader {
     this.session.recordId = recordId;
     this.session.entities = [];
     this.session.entitySchemaName = null;
+    this.session.annotations = new AnnotationCollection();
 
     // Kick off both the dataset metadata fetch and the entities listing in
     // parallel — they don't depend on each other and the entities call is
@@ -146,6 +151,17 @@ export class RecordLoader {
     if (claimed.length === 0) {
       throw new Error(`No renderable views for record "${recordId}" in dataset "${datasetId}".`);
     }
+
+    // Merge every seed's annotation contributions into the record's shared
+    // collection, deduplicating by id: two views can both list the same
+    // record-scoped annotation (e.g. a bbox3d) and it must exist once.
+    const annotationsById = new Map<string, LocalAnnotation>();
+    for (const { seed } of claimed) {
+      for (const annotation of seed.annotations ?? []) {
+        if (!annotationsById.has(annotation.id)) annotationsById.set(annotation.id, annotation);
+      }
+    }
+    this.session.annotations = new AnnotationCollection([...annotationsById.values()]);
 
     const layouts = planViewportLayouts(claimed.length, viewport);
 

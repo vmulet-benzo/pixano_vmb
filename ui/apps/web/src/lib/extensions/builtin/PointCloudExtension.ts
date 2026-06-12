@@ -4,10 +4,7 @@ Author : pixano@cea.fr
 License: CECILL-C
 -------------------------------------*/
 
-import {
-  AnnotationCollection,
-  type LocalBBox3DAnnotation,
-} from "$lib/annotations/annotationCollection.svelte.js";
+import type { LocalBBox3DAnnotation } from "$lib/annotations/annotationCollection.svelte.js";
 import { DEFAULT_TOOL_3D } from "$lib/annotations/tools/types3d.js";
 import type { PointCloudWidgetStorage } from "$lib/annotations/types.js";
 import type { BBox3DRow } from "$lib/api/annotations.js";
@@ -35,11 +32,7 @@ export const PointCloudExtension = WidgetExtension.create({
   }),
   addStorage: (): PointCloudWidgetStorage => ({
     activeToolId: DEFAULT_TOOL_3D,
-    annotations: new AnnotationCollection(),
   }),
-  findLocalDraft: (storage, localId) => {
-    return (storage as PointCloudWidgetStorage).annotations?.find(localId);
-  },
   addRecordSeed: async ({ datasetId, recordId, viewName, viewDef, entitiesById, gateway }) => {
     if (!viewDef.base || !CLAIMED_BASES.has(viewDef.base)) return null;
 
@@ -66,6 +59,7 @@ export const PointCloudExtension = WidgetExtension.create({
         id: b.id,
         entityId: b.entity_id,
         kind: "bbox3d",
+        viewId: b.view_id ?? "",
         geometry: { coords: b.coords, format: b.format, rotation: b.rotation },
         persisted: true,
         entity: b.entity_id ? entitiesById.get(b.entity_id) : undefined,
@@ -76,7 +70,7 @@ export const PointCloudExtension = WidgetExtension.create({
       title: viewName,
       options: {},
       data: { pointCloudUrl: pointCloud?.src, datasetId, recordId, viewId: pointCloud?.id ?? "" },
-      storage: { annotations: new AnnotationCollection(annotations) },
+      annotations,
     };
   },
 });

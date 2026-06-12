@@ -14,6 +14,13 @@ import type { CoordsNorm } from "./types.js";
 export type AnnotationKind = "bbox" | "bbox3d" | "keypoints" | "mask";
 
 /**
+ * Kinds that apply to the whole record rather than a single view (e.g. a 3D
+ * box lives in the scene, not in one camera). They pass every view filter,
+ * which is what lets the image widget project them.
+ */
+export const RECORD_SCOPED_KINDS: ReadonlySet<AnnotationKind> = new Set(["bbox3d"]);
+
+/**
  * The one local representation shared by every annotation kind. Pure data:
  * rendering, input handling and payload building live in per-kind modules,
  * never as methods here (see docs/ARCHITECTURE.md, decision D4).
@@ -22,6 +29,12 @@ export interface LocalAnnotation<G = unknown> {
   id: string;
   entityId: string;
   kind: AnnotationKind;
+  /**
+   * Id of the view row this annotation belongs to (the image row id for 2D
+   * kinds). Record-scoped kinds keep whatever the backend row carried —
+   * often "" — and are visible in every view regardless.
+   */
+  viewId: string;
   /** Per-kind geometry payload, typed in the kind's module. */
   geometry: G;
   /** True once the annotation (and its entity) have been POSTed to the backend. */
@@ -54,16 +67,35 @@ export type LocalBBox3DAnnotation = LocalAnnotation<BBox3DGeometry>;
 export type LocalKeypoints = LocalAnnotation<KeypointsGeometry>;
 
 /**
- * Owns the local annotation list of one widget instance: membership,
- * selection, geometry edits and the persisted flip. This is the single
- * lifecycle implementation shared by 2D and 3D widgets — widgets and tools
- * call into it instead of owning draft/override bookkeeping themselves.
+ * The surface tools, renderers and widgets program against. Implemented by
+ * the record-scoped `AnnotationCollection` and by the per-widget
+ * `ViewScopedAnnotations` facade, so plugins never know which one they hold.
+ */
+export interface AnnotationStore {
+  readonly items: LocalAnnotation[];
+  readonly selectedId: string | null;
+  readonly selected: LocalAnnotation | undefined;
+  readonly count: number;
+  find(id: string): LocalAnnotation | undefined;
+  byKind<G>(kind: AnnotationKind): LocalAnnotation<G>[];
+  add(annotation: LocalAnnotation): void;
+  remove(id: string): void;
+  select(id: string | null): void;
+  setGeometry<G>(id: string, geometry: G): void;
+  markPersisted(id: string): void;
+}
+
+/**
+ * The single source of truth for one loaded record's annotations: membership,
+ * selection, geometry edits and the persisted flip. Owned by
+ * `WorkspaceSession` (one instance per record load) and shared by every
+ * widget viewing that record — moving a 3D box updates its 2D projection
+ * because both read the same annotation.
  *
  * Optimistic edits mutate `geometry` in place; the pending mutation queue is
- * the ledger of what still has to reach the backend (matching the original
- * 2D behavior; the 3D `overrides` map this replaces did the same job).
+ * the ledger of what still has to reach the backend.
  */
-export class AnnotationCollection {
+export class AnnotationCollection implements AnnotationStore {
   items = $state<LocalAnnotation[]>([]);
   selectedId = $state<string | null>(null);
 
@@ -104,5 +136,70 @@ export class AnnotationCollection {
   markPersisted(id: string): void {
     const annotation = this.find(id);
     if (annotation) annotation.persisted = true;
+  }
+}
+
+/**
+ * A widget's window onto the shared record collection: shows the annotations
+ * of one view plus every record-scoped annotation, while writes (selection,
+ * geometry, add/remove) go straight to the shared collection so every other
+ * widget sees them immediately.
+ *
+ * Takes a getter rather than an instance because the session replaces the
+ * collection on each record load.
+ */
+export class ViewScopedAnnotations implements AnnotationStore {
+  constructor(
+    private readonly getParent: () => AnnotationCollection,
+    private readonly viewId: string,
+  ) {}
+
+  private _visible(annotation: LocalAnnotation): boolean {
+    return annotation.viewId === this.viewId || RECORD_SCOPED_KINDS.has(annotation.kind);
+  }
+
+  get items(): LocalAnnotation[] {
+    return this.getParent().items.filter((a) => this._visible(a));
+  }
+
+  get selectedId(): string | null {
+    return this.getParent().selectedId;
+  }
+
+  get selected(): LocalAnnotation | undefined {
+    return this.getParent().selected;
+  }
+
+  get count(): number {
+    return this.items.length;
+  }
+
+  find(id: string): LocalAnnotation | undefined {
+    const annotation = this.getParent().find(id);
+    return annotation && this._visible(annotation) ? annotation : undefined;
+  }
+
+  byKind<G>(kind: AnnotationKind): LocalAnnotation<G>[] {
+    return this.items.filter((a) => a.kind === kind) as LocalAnnotation<G>[];
+  }
+
+  add(annotation: LocalAnnotation): void {
+    this.getParent().add(annotation);
+  }
+
+  remove(id: string): void {
+    this.getParent().remove(id);
+  }
+
+  select(id: string | null): void {
+    this.getParent().select(id);
+  }
+
+  setGeometry<G>(id: string, geometry: G): void {
+    this.getParent().setGeometry(id, geometry);
+  }
+
+  markPersisted(id: string): void {
+    this.getParent().markPersisted(id);
   }
 }

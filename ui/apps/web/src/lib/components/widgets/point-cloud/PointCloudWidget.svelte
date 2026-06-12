@@ -123,11 +123,11 @@ License: CECILL-C
     coords: [number, number, number, number, number, number],
     rotation: number[] | undefined,
   ): void {
-    const annotation = storage.annotations.find(boxId);
+    const annotation = manager.annotations.find(boxId);
     if (!annotation) return;
 
     const geometry: BBox3DGeometry = { coords, format: "xyzwhd", rotation };
-    storage.annotations.setGeometry(boxId, geometry);
+    manager.annotations.setGeometry(boxId, geometry);
 
     if (annotation.persisted) {
       const updateBody = bbox3dPayloadBuilder.buildUpdate(
@@ -172,10 +172,11 @@ License: CECILL-C
       id: generateShortId(),
       entityId: generateShortId(),
       kind: "bbox3d",
+      viewId,
       geometry: { coords, format: "xyzwhd", rotation },
       persisted: false,
     };
-    storage.annotations.add(draft);
+    manager.annotations.add(draft);
     for (const m of bbox3dPayloadBuilder.buildCreate({ datasetId, recordId, viewId }, draft, stableWidgetId)) {
       manager.queueMutation(m);
     }
@@ -188,7 +189,7 @@ License: CECILL-C
   }
 
   const allBboxes3d = $derived<LocalBBox3D[]>(
-    storage.annotations.byKind<BBox3DGeometry>("bbox3d").map(
+    manager.annotations.byKind<BBox3DGeometry>("bbox3d").map(
       (a): LocalBBox3D => ({
         id: a.id,
         record_id: recordId,
