@@ -72,6 +72,7 @@ service inside the Threlte scene, because that's where the camera lives.
 | Tool/renderer interfaces, `Scene2DContext` | `lib/annotations/tools/types2d.ts` |
 | Registries (2D tools + renderers) | `lib/annotations/tools/registry2d.ts` |
 | Payload-builder registry, generic delete | `lib/annotations/payloadBuilders.ts` |
+| Seed-loader registry (REST→local, once per record) | `lib/annotations/seedLoaders.ts` |
 | One folder per kind | `lib/annotations/kinds/2d/bbox/`, `3d/bbox3d/` |
 | Shared 2D pixel↔normalized helpers | `lib/annotations/tools/scene2dGeometry.ts` |
 | 3D Lance↔Three.js transforms | `lib/annotations/coordinateTransforms.ts` |
