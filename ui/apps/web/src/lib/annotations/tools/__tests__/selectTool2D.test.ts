@@ -12,7 +12,7 @@ import { selectTool2D } from "../selectTool2D.js";
 import { DEFAULT_TOOL_2D, type Scene2DContext } from "../types2d.js";
 
 function makeBBox(id: string, persisted = true): LocalBBox {
-  return { id, entityId: `e-${id}`, kind: "bbox", geometry: [0.1, 0.1, 0.2, 0.2], persisted };
+  return { id, entityId: `e-${id}`, kind: "bbox", viewId: "view", geometry: [0.1, 0.1, 0.2, 0.2], persisted };
 }
 
 function makeContext(collection: AnnotationCollection) {

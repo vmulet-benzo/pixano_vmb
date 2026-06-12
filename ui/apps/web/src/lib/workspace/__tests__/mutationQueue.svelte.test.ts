@@ -113,12 +113,11 @@ describe("MutationQueue.flush", () => {
     expect(queue.saveError).toBeNull();
   });
 
-  it("marks the LocalBBox as persisted after a successful create", async () => {
+  it("marks the local annotation as persisted after a successful create", async () => {
     const { gateway } = makeGateway();
     const bbox = { persisted: false };
     const locator: LocalAnnotationLocator = {
-      findLocalAnnotation: (widgetId, localAnnotationId) =>
-        widgetId === "w-1" && localAnnotationId === "lb-1" ? bbox : undefined,
+      findLocalAnnotation: (localAnnotationId) => (localAnnotationId === "lb-1" ? bbox : undefined),
     };
     const queue = new MutationQueue(gateway, makeSession(), locator);
 

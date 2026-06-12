@@ -9,6 +9,7 @@ License: CECILL-C
   import { Save, Trash2 } from "lucide-svelte";
   import { getContext, onMount } from "svelte";
 
+  import { ViewScopedAnnotations } from "$lib/annotations/annotationCollection.svelte.js";
   import { deleteLocalAnnotation } from "$lib/annotations/payloadBuilders.js";
   import {
     DEFAULT_TOOL_2D,
@@ -34,6 +35,10 @@ License: CECILL-C
   const storage = manager.getStorage(stableWidgetId) as ImageWidgetStorage;
   // svelte-ignore state_referenced_locally
   const imgOptions = options as ImageWidgetOptions;
+
+  // This widget's window onto the record's shared annotation collection:
+  // this view's 2D annotations plus record-scoped kinds (e.g. bbox3d).
+  const annotations = new ViewScopedAnnotations(() => manager.annotations, imgOptions.viewId);
 
   let containerEl = $state<HTMLDivElement>(null!);
   let imageLoaded = $state(false);
@@ -121,7 +126,7 @@ License: CECILL-C
         recordId: imgOptions.recordId,
         viewId: imgOptions.viewId,
       },
-      collection: storage.annotations,
+      collection: annotations,
       mutations: {
         get pending() {
           return manager.pendingMutations;
@@ -212,12 +217,12 @@ License: CECILL-C
   });
 
   $effect(() => {
-    void storage.annotations.items.length;
-    void storage.annotations.selectedId;
+    void annotations.items.length;
+    void annotations.selectedId;
     if (imageLoaded) syncRenderers();
   });
 
-  const hasSelection = $derived(storage.annotations.selectedId !== null);
+  const hasSelection = $derived(annotations.selectedId !== null);
   const widgetPending = $derived(
     new Set(
       manager.pendingMutations
@@ -248,9 +253,9 @@ License: CECILL-C
     <button
       type="button"
       onclick={() => {
-        const annotation = storage.annotations.selected;
+        const annotation = annotations.selected;
         if (!annotation || !sceneContext) return;
-        deleteLocalAnnotation(annotation, storage.annotations, sceneContext.mutations, stableWidgetId);
+        deleteLocalAnnotation(annotation, annotations, sceneContext.mutations, stableWidgetId);
         syncRenderers();
       }}
       disabled={!hasSelection}

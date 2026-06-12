@@ -4,7 +4,7 @@ Author : pixano@cea.fr
 License: CECILL-C
 -------------------------------------*/
 
-import { AnnotationCollection, type LocalBBox } from "$lib/annotations/annotationCollection.svelte.js";
+import type { LocalBBox } from "$lib/annotations/annotationCollection.svelte.js";
 import { DEFAULT_TOOL_2D } from "$lib/annotations/tools/types2d.js";
 import type {
   CameraCalibration,
@@ -55,11 +55,7 @@ export const ImageExtension = WidgetExtension.create<ImageWidgetOptions, ImageWi
   }),
   addStorage: () => ({
     activeToolId: DEFAULT_TOOL_2D,
-    annotations: new AnnotationCollection(),
   }),
-  findLocalDraft: (storage, localId) => {
-    return (storage as ImageWidgetStorage).annotations?.find(localId);
-  },
   addRecordSeed: async ({ datasetId, recordId, viewName, viewDef, entitiesById, gateway }) => {
     if (!viewDef.base || !CLAIMED_BASES.has(viewDef.base)) return null;
 
@@ -99,6 +95,9 @@ export const ImageExtension = WidgetExtension.create<ImageWidgetOptions, ImageWi
           id: b.id,
           entityId: b.entity_id,
           kind: "bbox",
+          // Normalize legacy camera-name view ids to the image row id so the
+          // widget's view filter has one canonical value to match.
+          viewId: image?.id ?? "",
           geometry: coordsNorm,
           persisted: true,
           entity: entitiesById.get(b.entity_id),
@@ -117,7 +116,7 @@ export const ImageExtension = WidgetExtension.create<ImageWidgetOptions, ImageWi
         calibration: _extractCalibration(image),
       },
       data: { imageUrl: image?.src },
-      storage: { annotations: new AnnotationCollection(seedBBoxes) },
+      annotations: seedBBoxes,
     };
   },
 });

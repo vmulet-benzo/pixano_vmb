@@ -4,6 +4,7 @@ Author : pixano@cea.fr
 License: CECILL-C
 -------------------------------------*/
 
+import type { LocalAnnotation } from "$lib/annotations/annotationCollection.svelte.js";
 import type { EntityRow } from "$lib/api/annotations.js";
 import type { SchemaDescriptor } from "$lib/types/dataset";
 
@@ -52,6 +53,11 @@ export interface SeedContext {
  * `seed.storage` is merged into whatever `WidgetExtensionConfig.addStorage`
  * produces, atomically with widget creation, so the widget mounts already
  * populated.
+ *
+ * `seed.annotations` are contributed to the record's *shared*
+ * `AnnotationCollection` on `WorkspaceSession` — the loader merges every
+ * seed's contributions, deduplicating by id (two views may both list the
+ * same record-scoped bbox3d).
  */
 export interface RecordWidgetSeed<
   TStorage extends Record<string, unknown> = Record<string, unknown>,
@@ -61,4 +67,5 @@ export interface RecordWidgetSeed<
   options?: Record<string, unknown>;
   data?: Record<string, unknown>;
   storage?: Partial<TStorage>;
+  annotations?: LocalAnnotation[];
 }

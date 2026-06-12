@@ -7,8 +7,8 @@ License: CECILL-C
 import { ENTITY_RESOURCE } from "$lib/api/resourceNames.js";
 
 import type {
-  AnnotationCollection,
   AnnotationKind,
+  AnnotationStore,
   LocalAnnotation,
 } from "./annotationCollection.svelte.js";
 import type { BuildContext } from "./buildPayloads.js";
@@ -75,7 +75,7 @@ export function buildDeleteMutations(
  */
 export function deleteLocalAnnotation(
   annotation: LocalAnnotation,
-  collection: AnnotationCollection,
+  collection: AnnotationStore,
   mutations: MutationSink,
   widgetId: string,
 ): void {

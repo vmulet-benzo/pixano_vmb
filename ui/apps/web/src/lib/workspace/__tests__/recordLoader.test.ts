@@ -111,6 +111,77 @@ const VIEWPORT = { width: 1600, height: 900 };
 // ─── Tests ────────────────────────────────────────────────────────────────────
 
 describe("RecordLoader.load", () => {
+  it("merges seed annotations into the shared session collection, deduplicating by id", async () => {
+    const dataset = makeDataset({ cam_a: { base: "Image" }, cam_b: { base: "Image" } });
+    // Both views contribute the same record-scoped bbox3d plus one own bbox.
+    const sharedBox3d = {
+      id: "box3d-1",
+      entityId: "e-3d",
+      kind: "bbox3d" as const,
+      viewId: "",
+      geometry: { coords: [0, 0, 0, 1, 1, 1], format: "xyzwhd" as const },
+      persisted: true,
+    };
+    const ext: WidgetExtensionConfig = {
+      ...makeImageExtension(),
+      addRecordSeed: async ({ viewName, viewDef }) => {
+        if (viewDef.base !== "Image") return null;
+        return {
+          title: viewName,
+          annotations: [
+            sharedBox3d,
+            {
+              id: `bbox-${viewName}`,
+              entityId: `e-${viewName}`,
+              kind: "bbox" as const,
+              viewId: viewName,
+              geometry: [0.1, 0.1, 0.2, 0.2] as [number, number, number, number],
+              persisted: true,
+            },
+          ],
+        };
+      },
+    };
+    const session = new WorkspaceSession();
+    const loader = new RecordLoader({
+      workspace: makeSink().sink,
+      registry: makeRegistry(ext),
+      gateway: makeGateway({ dataset }),
+      session,
+    });
+
+    await loader.load("ds-1", "rec-1", VIEWPORT);
+
+    expect(session.annotations.items.map((a) => a.id).sort()).toEqual([
+      "bbox-cam_a",
+      "bbox-cam_b",
+      "box3d-1",
+    ]);
+  });
+
+  it("resets the shared collection at the start of a new load", async () => {
+    const dataset = makeDataset({ cam: { base: "Image" } });
+    const session = new WorkspaceSession();
+    session.annotations.add({
+      id: "stale",
+      entityId: "e",
+      kind: "bbox",
+      viewId: "old",
+      geometry: [0, 0, 1, 1],
+      persisted: true,
+    });
+    const loader = new RecordLoader({
+      workspace: makeSink().sink,
+      registry: makeRegistry(makeImageExtension()),
+      gateway: makeGateway({ dataset }),
+      session,
+    });
+
+    await loader.load("ds-1", "rec-1", VIEWPORT);
+
+    expect(session.annotations.find("stale")).toBeUndefined();
+  });
+
   it("sets datasetId and recordId on the session", async () => {
     const dataset = makeDataset({ cam: { base: "Image" } });
     const { sink } = makeSink();

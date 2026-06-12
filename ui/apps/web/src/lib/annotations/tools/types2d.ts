@@ -6,7 +6,7 @@ License: CECILL-C
 
 import type Konva from "konva";
 
-import type { AnnotationCollection, AnnotationKind } from "../annotationCollection.svelte.js";
+import type { AnnotationKind, AnnotationStore } from "../annotationCollection.svelte.js";
 import type { BuildContext } from "../buildPayloads.js";
 import type { ResourceMutation } from "../types.js";
 import type { ToolDefinition } from "./toolDefinition.js";
@@ -38,7 +38,8 @@ export interface MutationSink {
 export interface Scene2DContext {
   readonly widgetId: string;
   readonly buildContext: BuildContext;
-  readonly collection: AnnotationCollection;
+  /** View-scoped window onto the record's shared annotation collection. */
+  readonly collection: AnnotationStore;
   readonly mutations: MutationSink;
   readonly stage: Konva.Stage;
   readonly annotationLayer: Konva.Layer;
