@@ -5,6 +5,7 @@ License: CECILL-C
 -------------------------------------*/
 
 import type { AnnotationCollection } from "$lib/annotations/annotationCollection.svelte.js";
+import type { PlaybackClock } from "$lib/annotations/playbackClock.svelte.js";
 import type { ResourceMutation } from "$lib/annotations/types.js";
 import type { EntityRow } from "$lib/api/annotations.js";
 import type { WidgetInstance, WidgetLayout, WorkspacePreset } from "$lib/extensions/types.js";
@@ -92,6 +93,11 @@ export class WorkspaceManager {
   /** Shared annotations of the loaded record (one collection per record). */
   get annotations(): AnnotationCollection {
     return this.session.annotations;
+  }
+
+  /** Shared playhead of the loaded record (one clock per record). */
+  get clock(): PlaybackClock {
+    return this.session.clock;
   }
 
   // ─── Mutation queue forwarders ────────────────────────────────────────────

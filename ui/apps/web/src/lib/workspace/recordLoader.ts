@@ -8,6 +8,7 @@ import {
   AnnotationCollection,
   type LocalAnnotation,
 } from "$lib/annotations/annotationCollection.svelte.js";
+import { PlaybackClock } from "$lib/annotations/playbackClock.svelte.js";
 import type { EntityRow } from "$lib/api/annotations.js";
 import type { WidgetInstance } from "$lib/extensions/types.js";
 import type { WidgetRegistry } from "$lib/extensions/WidgetRegistry.js";
@@ -85,6 +86,8 @@ export class RecordLoader {
     this.session.entities = [];
     this.session.entitySchemaName = null;
     this.session.annotations = new AnnotationCollection();
+    this.session.clock.pause();
+    this.session.clock = new PlaybackClock();
 
     // Kick off both the dataset metadata fetch and the entities listing in
     // parallel — they don't depend on each other and the entities call is

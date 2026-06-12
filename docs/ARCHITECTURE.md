@@ -59,6 +59,21 @@ across existing widgets.
 - **D5 — Validation by construction.** The first genuinely new tool implemented
   on the new seams is **2D keypoints** (cheap, exercises every seam). Mask RLE
   comes after, as the hardest case (RLE codecs, brush/polygon input, compositing).
+- **D6 — Temporal kinds split rendering into `sync()` + `tick()`.** Playback is
+  the first thing in the design that updates without user input, so the
+  contract separates cadences: `sync()` reconciles scene nodes on *collection*
+  change (event-driven, may allocate); the optional `tick(timeMs)` adjusts
+  what is visible at the playhead (per-frame during playback, must be
+  allocation-free, never creates or destroys nodes). The time source is a
+  record-scoped `PlaybackClock` on `WorkspaceSession` — shared truth like the
+  annotation collection, advanced by exactly one internal loop so multiple
+  widgets can read it without double-driving it. Temporal indexes
+  (`visibleAt(t)` semantics) belong to each kind's module, never to the
+  shared collection. Validated by spike: both seams are purely additive
+  (`Scene2DContext.clock?`, `AnnotationRenderer2D.tick?`) — existing
+  renderers and tools are untouched (see
+  `tools/__tests__/temporalRendererContract.test.ts`). Full video support
+  (codecs, frame extraction, tracklet UI) remains out of scope per D2.
 
 ## Target architecture
 

@@ -5,6 +5,7 @@ License: CECILL-C
 -------------------------------------*/
 
 import { AnnotationCollection } from "$lib/annotations/annotationCollection.svelte.js";
+import { PlaybackClock } from "$lib/annotations/playbackClock.svelte.js";
 import type { EntityRow } from "$lib/api/annotations.js";
 
 /**
@@ -30,6 +31,8 @@ export class WorkspaceSession {
   entitySchemaName = $state<string | null>(null);
   /** Shared annotations of the loaded record; replaced on every load. */
   annotations = $state(new AnnotationCollection());
+  /** Shared playhead of the loaded record; replaced on every load. */
+  clock = $state(new PlaybackClock());
 
   /** Reset the selection (e.g. on `clearWorkspace`). */
   reset(): void {
@@ -38,5 +41,7 @@ export class WorkspaceSession {
     this.entities = [];
     this.entitySchemaName = null;
     this.annotations = new AnnotationCollection();
+    this.clock.pause();
+    this.clock = new PlaybackClock();
   }
 }

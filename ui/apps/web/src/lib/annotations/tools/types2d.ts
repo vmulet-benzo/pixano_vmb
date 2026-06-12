@@ -8,6 +8,7 @@ import type Konva from "konva";
 
 import type { AnnotationKind, AnnotationStore } from "../annotationCollection.svelte.js";
 import type { BuildContext } from "../buildPayloads.js";
+import type { PlaybackClock } from "../playbackClock.svelte.js";
 import type { ResourceMutation } from "../types.js";
 import type { ToolDefinition } from "./toolDefinition.js";
 
@@ -48,6 +49,11 @@ export interface Scene2DContext {
   setActiveTool(id: string): void;
   /** Ask the widget to re-sync annotation rendering. */
   requestRedraw(): void;
+  /**
+   * Record-scoped playhead, for temporal kinds (video, audio). Optional so
+   * non-temporal hosts and tests don't have to provide one.
+   */
+  readonly clock?: PlaybackClock;
 }
 
 /**
@@ -57,8 +63,15 @@ export interface Scene2DContext {
  */
 export interface AnnotationRenderer2D {
   readonly kind: AnnotationKind;
-  /** Reconcile scene nodes with the collection. */
+  /** Reconcile scene nodes with the collection. Event-driven (rare). */
   sync(): void;
+  /**
+   * Optional per-frame update for temporal kinds: adjust what is visible at
+   * `timeMs` (show/hide/move existing nodes), never create or destroy nodes
+   * — that is `sync()`'s job. Must be allocation-free; runs at frame rate
+   * during playback (docs/ARCHITECTURE.md, decision D6).
+   */
+  tick?(timeMs: number): void;
   destroy(): void;
 }
 

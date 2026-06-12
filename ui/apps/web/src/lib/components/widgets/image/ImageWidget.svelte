@@ -141,6 +141,9 @@ License: CECILL-C
         storage.activeToolId = id;
       },
       requestRedraw: () => syncRenderers(),
+      get clock() {
+        return manager.clock;
+      },
     };
 
     renderers = RENDERER_FACTORIES_2D.map((factory) => factory.create(sceneContext!));
@@ -220,6 +223,14 @@ License: CECILL-C
     void annotations.items.length;
     void annotations.selectedId;
     if (imageLoaded) syncRenderers();
+  });
+
+  // Per-frame path for temporal kinds: while the record's clock advances,
+  // renderers adjust visibility for the playhead. Cheap by contract —
+  // tick() never creates or destroys nodes (that is sync()'s job).
+  $effect(() => {
+    const timeMs = manager.clock.currentTimeMs;
+    for (const renderer of renderers) renderer.tick?.(timeMs);
   });
 
   const hasSelection = $derived(annotations.selectedId !== null);
