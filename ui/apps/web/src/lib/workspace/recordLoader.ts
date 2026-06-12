@@ -4,11 +4,9 @@ Author : pixano@cea.fr
 License: CECILL-C
 -------------------------------------*/
 
-import {
-  AnnotationCollection,
-  type LocalAnnotation,
-} from "$lib/annotations/annotationCollection.svelte.js";
+import { AnnotationCollection } from "$lib/annotations/annotationCollection.svelte.js";
 import { PlaybackClock } from "$lib/annotations/playbackClock.svelte.js";
+import { SEED_LOADERS, type ViewInfo } from "$lib/annotations/seedLoaders.js";
 import type { EntityRow } from "$lib/api/annotations.js";
 import type { WidgetInstance } from "$lib/extensions/types.js";
 import type { WidgetRegistry } from "$lib/extensions/WidgetRegistry.js";
@@ -155,16 +153,28 @@ export class RecordLoader {
       throw new Error(`No renderable views for record "${recordId}" in dataset "${datasetId}".`);
     }
 
-    // Merge every seed's annotation contributions into the record's shared
-    // collection, deduplicating by id: two views can both list the same
-    // record-scoped annotation (e.g. a bbox3d) and it must exist once.
-    const annotationsById = new Map<string, LocalAnnotation>();
+    // Index every claimed view by row id AND logical name (legacy rows used
+    // the camera name as view_id), then run each kind's seed loader once for
+    // the whole record. REST→local mapping lives in the kind modules — the
+    // loader only orchestrates (docs/ARCHITECTURE.md, seed-loader registry).
+    const views = new Map<string, ViewInfo>();
     for (const { seed } of claimed) {
-      for (const annotation of seed.annotations ?? []) {
-        if (!annotationsById.has(annotation.id)) annotationsById.set(annotation.id, annotation);
-      }
+      if (!seed.view) continue;
+      if (seed.view.id) views.set(seed.view.id, seed.view);
+      views.set(seed.view.logicalName, seed.view);
     }
-    this.session.annotations = new AnnotationCollection([...annotationsById.values()]);
+    const seedContext = {
+      datasetId,
+      recordId,
+      gateway: this.readGateway,
+      entitiesById,
+      views,
+    };
+    const loaded = await Promise.all(SEED_LOADERS.map((loader) => loader.load(seedContext)));
+
+    // A newer load() was started while annotations were fetching.
+    if (token !== this.loadToken) return;
+    this.session.annotations = new AnnotationCollection(loaded.flat());
 
     const layouts = planViewportLayouts(claimed.length, viewport);
 

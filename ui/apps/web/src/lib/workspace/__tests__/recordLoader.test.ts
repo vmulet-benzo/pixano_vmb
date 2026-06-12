@@ -112,34 +112,35 @@ const VIEWPORT = { width: 1600, height: 900 };
 // ─── Tests ────────────────────────────────────────────────────────────────────
 
 describe("RecordLoader.load", () => {
-  it("merges seed annotations into the shared session collection, deduplicating by id", async () => {
+  it("runs the per-kind seed loaders once per record against the claimed views", async () => {
     const dataset = makeDataset({ cam_a: { base: "Image" }, cam_b: { base: "Image" } });
-    // Both views contribute the same record-scoped bbox3d plus one own bbox.
-    const sharedBox3d = {
-      id: "box3d-1",
-      entityId: "e-3d",
-      kind: "bbox3d" as const,
-      viewId: "",
-      geometry: { coords: [0, 0, 0, 1, 1, 1], format: "xyzwhd" as const },
-      persisted: true,
-    };
+    const listBBoxes = vi.fn().mockResolvedValue([
+      {
+        id: "bb-a",
+        record_id: "rec-1",
+        entity_id: "e-a",
+        view_id: "img-a",
+        coords: [0.1, 0.1, 0.2, 0.2],
+        format: "xywh",
+        is_normalized: true,
+      },
+      {
+        id: "bb-hidden",
+        record_id: "rec-1",
+        entity_id: "e-x",
+        view_id: "not-displayed",
+        coords: [0.1, 0.1, 0.2, 0.2],
+        format: "xywh",
+        is_normalized: true,
+      },
+    ] as BBoxRow[]);
     const ext: WidgetExtensionConfig = {
       ...makeImageExtension(),
       addRecordSeed: async ({ viewName, viewDef }) => {
         if (viewDef.base !== "Image") return null;
         return {
           title: viewName,
-          annotations: [
-            sharedBox3d,
-            {
-              id: `bbox-${viewName}`,
-              entityId: `e-${viewName}`,
-              kind: "bbox" as const,
-              viewId: viewName,
-              geometry: [0.1, 0.1, 0.2, 0.2] as [number, number, number, number],
-              persisted: true,
-            },
-          ],
+          view: { id: `img-${viewName.slice(-1)}`, logicalName: viewName, width: 100, height: 100 },
         };
       },
     };
@@ -147,17 +148,17 @@ describe("RecordLoader.load", () => {
     const loader = new RecordLoader({
       workspace: makeSink().sink,
       registry: makeRegistry(ext),
-      gateway: makeGateway({ dataset }),
+      gateway: { ...makeGateway({ dataset }), listBBoxes },
       session,
     });
 
     await loader.load("ds-1", "rec-1", VIEWPORT);
 
-    expect(session.annotations.items.map((a) => a.id).sort()).toEqual([
-      "bbox-cam_a",
-      "bbox-cam_b",
-      "box3d-1",
-    ]);
+    // One record-scoped fetch, not one per view.
+    expect(listBBoxes).toHaveBeenCalledTimes(1);
+    // The displayed view's row is seeded; the undisplayed one is skipped.
+    expect(session.annotations.items.map((a) => a.id)).toEqual(["bb-a"]);
+    expect(session.annotations.find("bb-a")).toMatchObject({ viewId: "img-a", persisted: true });
   });
 
   it("resets the shared collection at the start of a new load", async () => {

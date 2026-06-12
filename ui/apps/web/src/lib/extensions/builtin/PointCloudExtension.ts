@@ -4,10 +4,8 @@ Author : pixano@cea.fr
 License: CECILL-C
 -------------------------------------*/
 
-import type { LocalBBox3DAnnotation } from "$lib/annotations/annotationCollection.svelte.js";
 import { DEFAULT_TOOL_3D } from "$lib/annotations/tools/types3d.js";
 import type { PointCloudWidgetStorage } from "$lib/annotations/types.js";
-import type { BBox3DRow } from "$lib/api/annotations.js";
 import PointCloudWidget from "$lib/components/widgets/point-cloud/PointCloudWidget.svelte";
 
 import { WidgetExtension } from "../WidgetExtension.js";
@@ -33,44 +31,23 @@ export const PointCloudExtension = WidgetExtension.create({
   addStorage: (): PointCloudWidgetStorage => ({
     activeToolId: DEFAULT_TOOL_3D,
   }),
-  addRecordSeed: async ({ datasetId, recordId, viewName, viewDef, entitiesById, gateway }) => {
+  addRecordSeed: async ({ datasetId, recordId, viewName, viewDef, gateway }) => {
     if (!viewDef.base || !CLAIMED_BASES.has(viewDef.base)) return null;
 
-    // 3D boxes are typically expressed in the record's ego/world frame and
-    // stored without a `view_id` (since they apply to the whole scene, not
-    // a single sensor). We therefore scope the listing to the record only.
-    // If a dataset later attaches boxes to a specific point-cloud view,
-    // the backend just returns the record-scoped superset.
-    //
-    // Fetched in parallel with the point cloud blob — they don't depend on
-    // each other, and this is the most common per-record latency offender.
-    const [pointCloud, bboxRows] = await Promise.all([
-      gateway.loadPointCloudByLogicalName(datasetId, recordId, viewName),
-      gateway.listBBox3Ds(datasetId, { recordId }).catch((err) => {
-        console.error("listBBox3Ds failed", err);
-        return [] as BBox3DRow[];
-      }),
-    ]);
-
-    // Attach the parent entity (when one exists) so the scene can render a
-    // label via `pickEntityLabel` without an extra fetch.
-    const annotations = bboxRows.map(
-      (b): LocalBBox3DAnnotation => ({
-        id: b.id,
-        entityId: b.entity_id,
-        kind: "bbox3d",
-        viewId: b.view_id ?? "",
-        geometry: { coords: b.coords, format: b.format, rotation: b.rotation },
-        persisted: true,
-        entity: b.entity_id ? entitiesById.get(b.entity_id) : undefined,
-      }),
-    );
+    const pointCloud = await gateway.loadPointCloudByLogicalName(datasetId, recordId, viewName);
 
     return {
       title: viewName,
       options: {},
       data: { pointCloudUrl: pointCloud?.src, datasetId, recordId, viewId: pointCloud?.id ?? "" },
-      annotations,
+      // 3D boxes are record-scoped; the bbox3d seed loader fetches them once
+      // per record regardless of this view description.
+      view: {
+        id: pointCloud?.id ?? "",
+        logicalName: viewName,
+        width: 0,
+        height: 0,
+      },
     };
   },
 });
