@@ -167,7 +167,13 @@ export function buildBBox3DUpdate(
 export function buildBBox3DCreate(
   ctx: BuildContext,
   coordsLance: [number, number, number, number, number, number],
-  opts: { widgetId?: string; localAnnotationId?: string; entityId?: string; bboxId?: string; rotation?: number[] } = {},
+  opts: {
+    widgetId?: string;
+    localAnnotationId?: string;
+    entityId?: string;
+    bboxId?: string;
+    rotation?: number[];
+  } = {},
 ): BuildBBoxResult {
   const entityId = opts.entityId ?? generateShortId();
   const bboxId = opts.bboxId ?? generateShortId();
