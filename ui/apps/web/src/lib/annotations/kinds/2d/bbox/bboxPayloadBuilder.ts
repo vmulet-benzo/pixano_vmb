@@ -7,8 +7,9 @@ License: CECILL-C
 import type { BBoxGeometry, LocalAnnotation } from "$lib/annotations/annotationCollection.svelte.js";
 import { buildBBoxCreate, buildBBoxUpdate, type BuildContext } from "$lib/annotations/buildPayloads.js";
 import type { ResourceMutation } from "$lib/annotations/types.js";
+import { BBOX_RESOURCE } from "$lib/api/resourceNames.js";
 
-export const BBOX_RESOURCE = "bboxes";
+export { BBOX_RESOURCE };
 
 /**
  * Payload knowledge for 2D boxes. The local annotation id doubles as the

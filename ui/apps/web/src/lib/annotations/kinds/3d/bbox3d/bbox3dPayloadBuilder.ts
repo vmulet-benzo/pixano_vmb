@@ -11,8 +11,9 @@ import {
   type BuildContext,
 } from "$lib/annotations/buildPayloads.js";
 import type { ResourceMutation } from "$lib/annotations/types.js";
+import { BBOX3D_RESOURCE } from "$lib/api/resourceNames.js";
 
-export const BBOX3D_RESOURCE = "bbox3ds";
+export { BBOX3D_RESOURCE };
 
 /**
  * Payload knowledge for 3D boxes. The local annotation id doubles as the

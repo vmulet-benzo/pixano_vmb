@@ -51,6 +51,21 @@ export class MutationQueue {
   }
 
   /**
+   * Queue an update, or — if an update for the same resource+id is already
+   * pending — replace its body. Lets an annotation be edited repeatedly before
+   * a save without piling up redundant updates for the same row. Owning this
+   * here keeps the "find-pending-update-or-queue" logic out of renderers and
+   * widgets (it was duplicated in both).
+   */
+  upsertUpdate(mutation: Extract<ResourceMutation, { op: "update" }>): void {
+    const existing = this.pending.find(
+      (m) => m.op === "update" && m.resource === mutation.resource && m.id === mutation.id,
+    );
+    if (existing && existing.op === "update") existing.body = mutation.body;
+    else this.pending.push(mutation);
+  }
+
+  /**
    * Drop every queued mutation that references the given local bbox id.
    * Used when a bbox is deleted locally before it has been persisted, so
    * we don't POST-then-DELETE it for nothing.

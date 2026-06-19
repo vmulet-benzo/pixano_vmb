@@ -132,6 +132,7 @@ License: CECILL-C
           return manager.pendingMutations;
         },
         queue: (m) => manager.queueMutation(m),
+        upsertUpdate: (m) => manager.upsertUpdateMutation(m),
         dropForLocalAnnotation: (id) => void manager.dropMutationsForLocalAnnotation(id),
       },
       stage,

@@ -4,6 +4,8 @@ Author : pixano@cea.fr
 License: CECILL-C
 -------------------------------------*/
 
+import { BBOX3D_RESOURCE, BBOX_RESOURCE, ENTITY_RESOURCE } from "$lib/api/resourceNames.js";
+
 import type { CoordsNorm, ResourceMutation } from "./types.js";
 
 const ID_ALPHABET = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
@@ -95,14 +97,14 @@ export function buildBBoxCreate(
   const mutations: ResourceMutation[] = [
     {
       op: "create",
-      resource: "entities",
+      resource: ENTITY_RESOURCE,
       body: entityBody,
       widgetId: opts.widgetId,
       localAnnotationId: opts.localAnnotationId,
     },
     {
       op: "create",
-      resource: "bboxes",
+      resource: BBOX_RESOURCE,
       body: bboxBody,
       widgetId: opts.widgetId,
       localAnnotationId: opts.localAnnotationId,
@@ -195,14 +197,14 @@ export function buildBBox3DCreate(
   const mutations: ResourceMutation[] = [
     {
       op: "create",
-      resource: "entities",
+      resource: ENTITY_RESOURCE,
       body: entityBody,
       widgetId: opts.widgetId,
       localAnnotationId: opts.localAnnotationId,
     },
     {
       op: "create",
-      resource: "bbox3ds",
+      resource: BBOX3D_RESOURCE,
       body: bboxBody,
       widgetId: opts.widgetId,
       localAnnotationId: opts.localAnnotationId,
@@ -213,16 +215,27 @@ export function buildBBox3DCreate(
 }
 
 /**
- * Ordering priority for mutations: entities must be created before bboxes that
- * reference them; deletes run last so we don't drop an entity whose bbox hasn't
- * been removed yet. Mirrors `mutationPriority` in pixano's saveOrchestration.
+ * Flush ordering: an entity must be created before the annotations that
+ * reference it, and deleted only after them — so creates run entity→annotation
+ * and deletes run annotation→entity (entity delete last). Mirrors
+ * `mutationPriority` in pixano's saveOrchestration.
  */
+const MUTATION_PRIORITY = {
+  entityCreate: 0,
+  annotationCreate: 1,
+  annotationDelete: 2,
+  entityDelete: 3,
+} as const;
+
 export function mutationPriority(m: ResourceMutation): number {
   if (m.op === "delete") {
-    return m.resource === "entities" ? 4 : 3;
+    return m.resource === ENTITY_RESOURCE
+      ? MUTATION_PRIORITY.entityDelete
+      : MUTATION_PRIORITY.annotationDelete;
   }
-  if (m.resource === "entities") return 0;
-  return 1;
+  return m.resource === ENTITY_RESOURCE
+    ? MUTATION_PRIORITY.entityCreate
+    : MUTATION_PRIORITY.annotationCreate;
 }
 
 export function sortMutations(mutations: ResourceMutation[]): ResourceMutation[] {

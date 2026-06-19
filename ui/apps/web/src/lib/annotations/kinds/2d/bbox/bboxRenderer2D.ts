@@ -7,7 +7,6 @@ License: CECILL-C
 import Konva from "konva";
 
 import type { LocalBBox } from "$lib/annotations/annotationCollection.svelte.js";
-import type { CoordsNorm } from "$lib/annotations/types.js";
 import {
   BBOX_COLOR_DRAFT,
   BBOX_COLOR_PERSISTED,
@@ -54,7 +53,7 @@ class BBoxRenderer2D implements AnnotationRenderer2D {
     const frame = getPixelFrame(this.ctx.getKonvaImage());
     const activeIds = new Set<string>();
 
-    for (const bbox of this.ctx.collection.byKind<CoordsNorm>("bbox")) {
+    for (const bbox of this.ctx.collection.byKind("bbox")) {
       activeIds.add(bbox.id);
       let rect = this.rectByBBoxId.get(bbox.id);
       if (!rect) {
@@ -130,25 +129,14 @@ class BBoxRenderer2D implements AnnotationRenderer2D {
     this.ctx.collection.setGeometry(bboxId, coordsNorm);
 
     if (bbox.persisted) {
-      const body = bboxPayloadBuilder.buildUpdate(
-        this.ctx.buildContext,
-        bbox as LocalBBox,
-      );
-      const existing = this.ctx.mutations.pending.find(
-        (m) => m.op === "update" && m.resource === bboxPayloadBuilder.resource && m.id === bbox.id,
-      );
-      if (existing && existing.op === "update") {
-        existing.body = body;
-      } else {
-        this.ctx.mutations.queue({
-          op: "update",
-          resource: bboxPayloadBuilder.resource,
-          id: bbox.id,
-          body,
-          widgetId: this.ctx.widgetId,
-          localAnnotationId: bbox.id,
-        });
-      }
+      this.ctx.mutations.upsertUpdate({
+        op: "update",
+        resource: bboxPayloadBuilder.resource,
+        id: bbox.id,
+        body: bboxPayloadBuilder.buildUpdate(this.ctx.buildContext, bbox as LocalBBox),
+        widgetId: this.ctx.widgetId,
+        localAnnotationId: bbox.id,
+      });
     } else {
       const pending = this.ctx.mutations.pending.find(
         (m) =>

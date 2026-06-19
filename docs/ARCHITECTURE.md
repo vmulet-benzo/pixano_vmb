@@ -102,9 +102,9 @@ and delete-with-pending-mutation-drop.
 ### 2. Tool registry (per scene type)
 
 ```ts
-interface ToolDefinition { id: string; labelKey: string; icon: string; kind: AnnotationKind; shortcut?: string }
-interface Tool2D extends ToolDefinition { create(ctx: Scene2DContext): ToolHandler2D }
-interface Tool3D extends ToolDefinition { create(ctx: Scene3DContext): ToolHandler3D }
+interface ToolDefinition { id: string; label: string; icon: ComponentType; kind?: AnnotationKind; cursor?: string }
+interface Tool2D extends ToolDefinition { createHandler(ctx: Scene2DContext): ToolHandler2D }
+type Tool3D = ToolDefinition  // metadata-only: 3D pointer handling lives in the scene's BoxEditor (see D3 / "Known debts")
 ```
 
 - `ToolHandler*` exposes `activate / deactivate / onPointerDown / onPointerMove /
@@ -186,3 +186,33 @@ Each phase ships independently with tests green.
 - A public, semver-stable plugin API (D1).
 - Changing the backend API, the widget extension registry, or the mutation queue
   flush semantics.
+
+## Known debts (tracked)
+
+Accepted weaker designs that **must be fixed later** — recorded here so the
+deviation is intentional, not forgotten (raised in the 2026-06-19 code review).
+
+- **DEBT-1 (was B1/S5) — bbox edit input lives in the renderer.**
+  `kinds/2d/bbox/bboxRenderer2D.ts` owns the `Konva.Transformer` + draggable
+  rects and commits geometry on drag/transform, so a *renderer* writes to the
+  collection and queue — contradicting D4 ("tools write, renderers read").
+  Fix: move the transformer + drag/transform-commit into the select tool (or a
+  shared edit controller), and hand renderers a **read-only** sub-interface of
+  `Scene2DContext` (no `mutations`/`setActiveTool`) so the leak is impossible by
+  construction. Deferred: the 2D edit interaction has no unit coverage yet, so
+  restructuring it is paired with DEBT-3. _Target: before the next 2D kind
+  (mask RLE) lands._
+
+- **DEBT-2 (was B3) — 3D write-path lives in `PointCloudWidget`.**
+  The widget builds bbox3d payloads, mutates the collection, and patches pending
+  mutations inline, so the 3D widget is a host **and** the bbox3d transport (a
+  host-not-tool / SRP break), and the 3D pipeline is not open/closed: adding a
+  3D kind needs widget surgery. Fix: introduce `Scene3DContext` + a `Tool3D`
+  handler factory (mirroring `Tool2D`) and move the write-path into the
+  bbox3d kind module. _Target: when the second 3D kind is added (the
+  trigger already noted in `tools/types3d.ts`)._
+
+- **DEBT-3 (was T1) — no renderer sync tests.** `bboxRenderer2D` (and the 3D
+  gizmo rendering) have no `sync()` tests; renderer-in-node testing needs a
+  Konva/Threlte mock harness. Fix: add a fake-`Scene2DContext` + mocked-Konva
+  harness and cover `sync()` reconcile/selection. _Target: alongside DEBT-1._

@@ -117,6 +117,11 @@ export class WorkspaceManager {
     this.mutations.queue(mutation);
   }
 
+  /** Queue an update, or replace the body of a pending update for the same resource+id. */
+  upsertUpdateMutation(mutation: Extract<ResourceMutation, { op: "update" }>): void {
+    this.mutations.upsertUpdate(mutation);
+  }
+
   /** Drop every queued mutation referencing the given local bbox id. */
   dropMutationsForLocalAnnotation(localAnnotationId: string): ResourceMutation[] {
     return this.mutations.dropForLocalAnnotation(localAnnotationId);

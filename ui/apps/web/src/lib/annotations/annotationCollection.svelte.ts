@@ -61,9 +61,31 @@ export type LocalBBox = LocalAnnotation<BBoxGeometry>;
 export type LocalBBox3DAnnotation = LocalAnnotation<BBox3DGeometry>;
 
 /**
+ * Maps each annotation kind to its geometry payload type, so `byKind(kind)`
+ * returns annotations typed with the matching geometry (no caller-supplied
+ * type argument that could mismatch the kind). Must cover every
+ * `AnnotationKind`; `mask` has no geometry module yet.
+ */
+export interface GeometryByKind {
+  bbox: BBoxGeometry;
+  bbox3d: BBox3DGeometry;
+  mask: unknown;
+}
+
+/**
  * The surface tools, renderers and widgets program against. Implemented by
  * the record-scoped `AnnotationCollection` and by the per-widget
  * `ViewScopedAnnotations` facade, so plugins never know which one they hold.
+ *
+ * Contract / substitutability note: an `AnnotationStore` represents the set of
+ * annotations *relevant to its holder*. For the record-scoped collection that
+ * is every annotation; for `ViewScopedAnnotations` it is one view's
+ * annotations plus record-scoped kinds. Reads (`items`/`find`/`byKind`/`count`)
+ * are therefore scoped to that relevant set, while writes pass through to the
+ * shared record. The intended narrowing means a `ViewScopedAnnotations` holder
+ * should only `add`/`setGeometry`/`select` annotations its own view can see
+ * (its `viewId`, or a record-scoped kind); adding an annotation for a different
+ * view succeeds on the shared record but will not appear in this store's reads.
  */
 export interface AnnotationStore {
   readonly items: LocalAnnotation[];
@@ -71,7 +93,7 @@ export interface AnnotationStore {
   readonly selected: LocalAnnotation | undefined;
   readonly count: number;
   find(id: string): LocalAnnotation | undefined;
-  byKind<G>(kind: AnnotationKind): LocalAnnotation<G>[];
+  byKind<K extends AnnotationKind>(kind: K): LocalAnnotation<GeometryByKind[K]>[];
   add(annotation: LocalAnnotation): void;
   remove(id: string): void;
   select(id: string | null): void;
@@ -104,8 +126,8 @@ export class AnnotationCollection implements AnnotationStore {
     return this.items.find((a) => a.id === id);
   }
 
-  byKind<G>(kind: AnnotationKind): LocalAnnotation<G>[] {
-    return this.items.filter((a) => a.kind === kind) as LocalAnnotation<G>[];
+  byKind<K extends AnnotationKind>(kind: K): LocalAnnotation<GeometryByKind[K]>[] {
+    return this.items.filter((a) => a.kind === kind) as LocalAnnotation<GeometryByKind[K]>[];
   }
 
   add(annotation: LocalAnnotation): void {
@@ -173,8 +195,8 @@ export class ViewScopedAnnotations implements AnnotationStore {
     return annotation && this._visible(annotation) ? annotation : undefined;
   }
 
-  byKind<G>(kind: AnnotationKind): LocalAnnotation<G>[] {
-    return this.items.filter((a) => a.kind === kind) as LocalAnnotation<G>[];
+  byKind<K extends AnnotationKind>(kind: K): LocalAnnotation<GeometryByKind[K]>[] {
+    return this.items.filter((a) => a.kind === kind) as LocalAnnotation<GeometryByKind[K]>[];
   }
 
   add(annotation: LocalAnnotation): void {

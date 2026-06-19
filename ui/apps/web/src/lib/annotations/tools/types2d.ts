@@ -27,6 +27,8 @@ export const DEFAULT_TOOL_2D = "select";
 export interface MutationSink {
   readonly pending: readonly ResourceMutation[];
   queue(mutation: ResourceMutation): void;
+  /** Queue an update, or replace the body of a pending update for the same resource+id. */
+  upsertUpdate(mutation: Extract<ResourceMutation, { op: "update" }>): void;
   dropForLocalAnnotation(localAnnotationId: string): void;
 }
 

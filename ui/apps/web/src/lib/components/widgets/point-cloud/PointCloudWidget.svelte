@@ -130,25 +130,14 @@ License: CECILL-C
     manager.annotations.setGeometry(boxId, geometry);
 
     if (annotation.persisted) {
-      const updateBody = bbox3dPayloadBuilder.buildUpdate(
-        { datasetId, recordId, viewId },
-        annotation as LocalBBox3DAnnotation,
-      );
-      const pending = manager.pendingMutations.find(
-        (m) => m.op === "update" && m.resource === BBOX3D_RESOURCE && m.id === boxId,
-      );
-      if (pending && pending.op === "update") {
-        pending.body = updateBody;
-      } else {
-        manager.queueMutation({
-          op: "update",
-          resource: BBOX3D_RESOURCE,
-          id: boxId,
-          body: updateBody,
-          widgetId: stableWidgetId,
-          localAnnotationId: boxId,
-        });
-      }
+      manager.upsertUpdateMutation({
+        op: "update",
+        resource: BBOX3D_RESOURCE,
+        id: boxId,
+        body: bbox3dPayloadBuilder.buildUpdate({ datasetId, recordId, viewId }, annotation as LocalBBox3DAnnotation),
+        widgetId: stableWidgetId,
+        localAnnotationId: boxId,
+      });
     } else {
       const pending = manager.pendingMutations.find(
         (m) =>
@@ -189,7 +178,7 @@ License: CECILL-C
   }
 
   const allBboxes3d = $derived<LocalBBox3D[]>(
-    manager.annotations.byKind<BBox3DGeometry>("bbox3d").map(
+    manager.annotations.byKind("bbox3d").map(
       (a): LocalBBox3D => ({
         id: a.id,
         record_id: recordId,
@@ -279,7 +268,7 @@ License: CECILL-C
             {cameraMode}
             onReadyToConfirm={handleReadyToConfirm}
             onDrawCanceled={handleDrawCanceled}
-            onLoadError={(msg) => (error = msg)}
+            onLoadError={(msg: string) => (error = msg)}
             {gizmoVisibility}
           />
         </CanvasComponent>

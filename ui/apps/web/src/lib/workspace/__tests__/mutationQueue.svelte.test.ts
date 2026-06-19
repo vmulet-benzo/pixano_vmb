@@ -66,6 +66,43 @@ const noopLocator: LocalAnnotationLocator = {
 
 // ─── Tests ──────────────────────────────────────────────────────────────────
 
+describe("MutationQueue.upsertUpdate", () => {
+  function update(id: string, body: Record<string, unknown>): Extract<ResourceMutation, { op: "update" }> {
+    return { op: "update", resource: "bboxes", id, body };
+  }
+
+  it("queues an update when none is pending for that resource+id", () => {
+    const { gateway } = makeGateway();
+    const queue = new MutationQueue(gateway, makeSession(), noopLocator);
+
+    queue.upsertUpdate(update("b1", { coords: [0, 0, 1, 1] }));
+
+    expect(queue.count).toBe(1);
+    expect(queue.pending[0]).toMatchObject({ op: "update", id: "b1", body: { coords: [0, 0, 1, 1] } });
+  });
+
+  it("replaces the body of the pending update instead of adding a second one", () => {
+    const { gateway } = makeGateway();
+    const queue = new MutationQueue(gateway, makeSession(), noopLocator);
+
+    queue.upsertUpdate(update("b1", { coords: [0, 0, 1, 1] }));
+    queue.upsertUpdate(update("b1", { coords: [9, 9, 2, 2] }));
+
+    expect(queue.count).toBe(1);
+    expect(queue.pending[0]).toMatchObject({ body: { coords: [9, 9, 2, 2] } });
+  });
+
+  it("keeps updates for different ids separate", () => {
+    const { gateway } = makeGateway();
+    const queue = new MutationQueue(gateway, makeSession(), noopLocator);
+
+    queue.upsertUpdate(update("b1", { v: 1 }));
+    queue.upsertUpdate(update("b2", { v: 2 }));
+
+    expect(queue.count).toBe(2);
+  });
+});
+
 describe("MutationQueue.flush", () => {
   it("does nothing when there's no dataset selected", async () => {
     const { gateway, calls } = makeGateway();
