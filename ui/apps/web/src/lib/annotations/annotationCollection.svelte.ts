@@ -80,12 +80,12 @@ export interface GeometryByKind {
  * Contract / substitutability note: an `AnnotationStore` represents the set of
  * annotations *relevant to its holder*. For the record-scoped collection that
  * is every annotation; for `ViewScopedAnnotations` it is one view's
- * annotations plus record-scoped kinds. Reads (`items`/`find`/`byKind`/`count`)
- * are therefore scoped to that relevant set, while writes pass through to the
- * shared record. The intended narrowing means a `ViewScopedAnnotations` holder
- * should only `add`/`setGeometry`/`select` annotations its own view can see
- * (its `viewId`, or a record-scoped kind); adding an annotation for a different
- * view succeeds on the shared record but will not appear in this store's reads.
+ * annotations plus record-scoped kinds. Reads — `items`/`find`/`byKind`/`count`
+ * AND `selected`/`selectedId` — are scoped to that relevant set: a selection
+ * pointing at an annotation this view can't show reads as no selection, so each
+ * widget only reports `hasSelection` (and lets its delete act) on something it
+ * actually displays. Writes pass through to the shared record, so a holder
+ * should only `add`/`setGeometry`/`select` annotations its own view can see.
  */
 export interface AnnotationStore {
   readonly items: LocalAnnotation[];
@@ -98,7 +98,6 @@ export interface AnnotationStore {
   remove(id: string): void;
   select(id: string | null): void;
   setGeometry<G>(id: string, geometry: G): void;
-  markPersisted(id: string): void;
 }
 
 /**
@@ -148,11 +147,6 @@ export class AnnotationCollection implements AnnotationStore {
     const annotation = this.find(id);
     if (annotation) annotation.geometry = geometry;
   }
-
-  markPersisted(id: string): void {
-    const annotation = this.find(id);
-    if (annotation) annotation.persisted = true;
-  }
 }
 
 /**
@@ -178,12 +172,16 @@ export class ViewScopedAnnotations implements AnnotationStore {
     return this.getParent().items.filter((a) => this._visible(a));
   }
 
+  // Selection is shared across widgets, but each view only "owns" a selection
+  // it can actually show — otherwise a widget reports `hasSelection` (and lets
+  // its delete button act) on an annotation belonging to another view.
   get selectedId(): string | null {
-    return this.getParent().selectedId;
+    return this.selected?.id ?? null;
   }
 
   get selected(): LocalAnnotation | undefined {
-    return this.getParent().selected;
+    const annotation = this.getParent().selected;
+    return annotation && this._visible(annotation) ? annotation : undefined;
   }
 
   get count(): number {
@@ -213,9 +211,5 @@ export class ViewScopedAnnotations implements AnnotationStore {
 
   setGeometry<G>(id: string, geometry: G): void {
     this.getParent().setGeometry(id, geometry);
-  }
-
-  markPersisted(id: string): void {
-    this.getParent().markPersisted(id);
   }
 }

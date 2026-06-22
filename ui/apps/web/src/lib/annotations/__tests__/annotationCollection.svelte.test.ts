@@ -78,11 +78,6 @@ describe("AnnotationCollection", () => {
     expect(collection.find("a")?.geometry).toEqual([0.5, 0.5, 0.1, 0.1]);
   });
 
-  it("markPersisted flips the flag", () => {
-    const collection = new AnnotationCollection([makeBBox("a", false)]);
-    collection.markPersisted("a");
-    expect(collection.find("a")?.persisted).toBe(true);
-  });
 });
 
 describe("ViewScopedAnnotations", () => {
@@ -114,11 +109,21 @@ describe("ViewScopedAnnotations", () => {
     expect(shared.find("a")).toBeUndefined();
   });
 
-  it("shares the selection with the parent collection", () => {
+  it("reflects a selection it can show (own view or record-scoped kind)", () => {
     const { shared, view1 } = makeShared();
     view1.select("box3d");
     expect(shared.selectedId).toBe("box3d");
+    expect(view1.selectedId).toBe("box3d");
     expect(view1.selected?.id).toBe("box3d");
+  });
+
+  it("reads a foreign-view selection as no selection (cross-view delete guard)", () => {
+    const { shared, view1 } = makeShared();
+    // Selection is shared, but "other" belongs to view-2.
+    shared.select("other");
+    expect(shared.selectedId).toBe("other");
+    expect(view1.selectedId).toBeNull();
+    expect(view1.selected).toBeUndefined();
   });
 
   it("follows the parent getter when the session replaces the collection", () => {

@@ -216,3 +216,14 @@ deviation is intentional, not forgotten (raised in the 2026-06-19 code review).
   gizmo rendering) have no `sync()` tests; renderer-in-node testing needs a
   Konva/Threlte mock harness. Fix: add a fake-`Scene2DContext` + mocked-Konva
   harness and cover `sync()` reconcile/selection. _Target: alongside DEBT-1._
+
+- **DEBT-4 (2026-06-22 review) — 3D boxes can't be deleted.** The point-cloud
+  pipeline has no delete path: `PointCloudWidget` / `boxEditor` /
+  `PointCloudScene` have no Trash button, no Delete/Backspace handler, and never
+  call `collection.remove`. 2D deletes via `deleteLocalAnnotation` (select tool
+  + widget button); the helper already supports `bbox3d` (`payloadBuilderFor`
+  covers the kind) — it is purely unwired. Fix: wire a 3D delete (button +
+  Delete key) through `deleteLocalAnnotation`. Deferred because it needs a UX
+  decision (button placement vs the confirm overlay; confirm-on-delete?), best
+  made deliberately rather than bolted on. _Target: with the next point-cloud
+  UX pass, before GA._
