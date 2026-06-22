@@ -133,6 +133,7 @@ License: CECILL-C
         },
         queue: (m) => manager.queueMutation(m),
         upsertUpdate: (m) => manager.upsertUpdateMutation(m),
+        patchPendingCreate: (id, resource, patch) => manager.patchPendingCreateMutation(id, resource, patch),
         dropForLocalAnnotation: (id) => void manager.dropMutationsForLocalAnnotation(id),
       },
       stage,

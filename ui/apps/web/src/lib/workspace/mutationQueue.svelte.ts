@@ -66,6 +66,24 @@ export class MutationQueue {
   }
 
   /**
+   * Merge `patch` into the body of a still-pending *create* for the given local
+   * annotation, if one exists (no-op otherwise). Lets a freshly drawn,
+   * not-yet-saved annotation be re-edited so its queued create carries the
+   * latest geometry. Owning this here keeps callers from reaching into
+   * `pending` and mutating a queued mutation's body in place.
+   */
+  patchPendingCreate(
+    localAnnotationId: string,
+    resource: string,
+    patch: Record<string, unknown>,
+  ): void {
+    const pending = this.pending.find(
+      (m) => m.op === "create" && m.resource === resource && m.localAnnotationId === localAnnotationId,
+    );
+    if (pending && pending.op === "create") Object.assign(pending.body, patch);
+  }
+
+  /**
    * Drop every queued mutation that references the given local bbox id.
    * Used when a bbox is deleted locally before it has been persisted, so
    * we don't POST-then-DELETE it for nothing.

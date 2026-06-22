@@ -138,16 +138,9 @@ class BBoxRenderer2D implements AnnotationRenderer2D {
         localAnnotationId: bbox.id,
       });
     } else {
-      const pending = this.ctx.mutations.pending.find(
-        (m) =>
-          m.op === "create" &&
-          m.resource === bboxPayloadBuilder.resource &&
-          m.widgetId === this.ctx.widgetId &&
-          m.localAnnotationId === bbox.id,
-      );
-      if (pending && pending.op === "create") {
-        (pending.body as Record<string, unknown>).coords = Array.from(coordsNorm);
-      }
+      this.ctx.mutations.patchPendingCreate(bbox.id, bboxPayloadBuilder.resource, {
+        coords: Array.from(coordsNorm),
+      });
     }
   }
 

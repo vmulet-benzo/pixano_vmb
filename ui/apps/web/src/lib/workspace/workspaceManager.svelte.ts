@@ -122,6 +122,15 @@ export class WorkspaceManager {
     this.mutations.upsertUpdate(mutation);
   }
 
+  /** Merge a patch into a still-pending create's body for the given local annotation. */
+  patchPendingCreateMutation(
+    localAnnotationId: string,
+    resource: string,
+    patch: Record<string, unknown>,
+  ): void {
+    this.mutations.patchPendingCreate(localAnnotationId, resource, patch);
+  }
+
   /** Drop every queued mutation referencing the given local bbox id. */
   dropMutationsForLocalAnnotation(localAnnotationId: string): ResourceMutation[] {
     return this.mutations.dropForLocalAnnotation(localAnnotationId);

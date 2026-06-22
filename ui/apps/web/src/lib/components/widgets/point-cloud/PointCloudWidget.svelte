@@ -139,17 +139,10 @@ License: CECILL-C
         localAnnotationId: boxId,
       });
     } else {
-      const pending = manager.pendingMutations.find(
-        (m) =>
-          m.op === "create" &&
-          m.resource === BBOX3D_RESOURCE &&
-          m.widgetId === stableWidgetId &&
-          m.localAnnotationId === boxId,
-      );
-      if (pending && pending.op === "create") {
-        pending.body.coords = Array.from(coords);
-        pending.body.rotation = rotation ?? DEFAULT_3D_ROTATION;
-      }
+      manager.patchPendingCreateMutation(boxId, BBOX3D_RESOURCE, {
+        coords: Array.from(coords),
+        rotation: rotation ?? DEFAULT_3D_ROTATION,
+      });
     }
   }
 

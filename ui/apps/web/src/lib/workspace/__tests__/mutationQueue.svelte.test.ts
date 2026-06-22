@@ -103,6 +103,48 @@ describe("MutationQueue.upsertUpdate", () => {
   });
 });
 
+describe("MutationQueue.patchPendingCreate", () => {
+  it("merges the patch into a pending create's body", () => {
+    const { gateway } = makeGateway();
+    const queue = new MutationQueue(gateway, makeSession(), noopLocator);
+    queue.queue({
+      op: "create",
+      resource: "bboxes",
+      body: { id: "b1", coords: [0, 0, 1, 1] },
+      localAnnotationId: "b1",
+    } as ResourceMutation);
+
+    queue.patchPendingCreate("b1", "bboxes", { coords: [5, 5, 2, 2] });
+
+    expect(queue.count).toBe(1);
+    expect(queue.pending[0]).toMatchObject({ op: "create", body: { id: "b1", coords: [5, 5, 2, 2] } });
+  });
+
+  it("is a no-op when no matching pending create exists", () => {
+    const { gateway } = makeGateway();
+    const queue = new MutationQueue(gateway, makeSession(), noopLocator);
+
+    queue.patchPendingCreate("ghost", "bboxes", { coords: [1, 2, 3, 4] });
+
+    expect(queue.count).toBe(0);
+  });
+
+  it("does not patch a create of a different resource or id", () => {
+    const { gateway } = makeGateway();
+    const queue = new MutationQueue(gateway, makeSession(), noopLocator);
+    queue.queue({
+      op: "create",
+      resource: "bbox3ds",
+      body: { id: "b1", coords: [0, 0, 0, 1, 1, 1] },
+      localAnnotationId: "b1",
+    } as ResourceMutation);
+
+    queue.patchPendingCreate("b1", "bboxes", { coords: [9, 9, 9, 9] });
+
+    expect(queue.pending[0]).toMatchObject({ body: { coords: [0, 0, 0, 1, 1, 1] } });
+  });
+});
+
 describe("MutationQueue.flush", () => {
   it("does nothing when there's no dataset selected", async () => {
     const { gateway, calls } = makeGateway();

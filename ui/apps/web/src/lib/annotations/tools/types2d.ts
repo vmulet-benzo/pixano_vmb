@@ -29,6 +29,8 @@ export interface MutationSink {
   queue(mutation: ResourceMutation): void;
   /** Queue an update, or replace the body of a pending update for the same resource+id. */
   upsertUpdate(mutation: Extract<ResourceMutation, { op: "update" }>): void;
+  /** Merge a patch into a still-pending create's body for the given local annotation. */
+  patchPendingCreate(localAnnotationId: string, resource: string, patch: Record<string, unknown>): void;
   dropForLocalAnnotation(localAnnotationId: string): void;
 }
 
