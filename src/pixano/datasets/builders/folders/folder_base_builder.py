@@ -90,7 +90,7 @@ class FolderBaseBuilder(DatasetBuilder):
         (e.g. ``.pcd.bin``) so that double-extension files are not silently
         dropped.
         """
-        return file.suffix in self.EXTENSIONS or "".join(file.suffixes) in self.EXTENSIONS
+        return file.suffix.lower() in self.EXTENSIONS or "".join(file.suffixes).lower() in self.EXTENSIONS
 
     def __init__(
         self,
