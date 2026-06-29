@@ -8,7 +8,7 @@ import type Konva from "konva";
 
 import type { AnnotationKind, AnnotationStore } from "../annotationCollection.svelte.js";
 import type { BuildContext } from "../buildPayloads.js";
-import type { ResourceMutation } from "../types.js";
+import type { ResourceMutation, CameraCalibration } from "../types.js";
 import type { ToolDefinition } from "./toolDefinition.js";
 
 export type { ToolDefinition } from "./toolDefinition.js";
@@ -47,6 +47,7 @@ export interface Scene2DContext {
   readonly mutations: MutationSink;
   readonly stage: Konva.Stage;
   readonly annotationLayer: Konva.Layer;
+  readonly camera: { imageWidth: number; imageHeight: number; calibration: CameraCalibration | null };
   getKonvaImage(): Konva.Image | null;
   /** Switch the widget's active tool (e.g. back to "select" after a draw). */
   setActiveTool(id: string): void;
