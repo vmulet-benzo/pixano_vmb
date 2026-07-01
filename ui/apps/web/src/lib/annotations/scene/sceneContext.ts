@@ -10,7 +10,7 @@ import type { OrbitControls as ThreeOrbitControls } from "three/examples/jsm/con
 
 import type { AnnotationStore } from "../annotationCollection.svelte.js";
 import type { BuildContext } from "../buildPayloads.js";
-import type { ResourceMutation } from "../types.js";
+import type { CameraCalibration, ResourceMutation } from "../types.js";
 
 /**
  * Narrow view of the mutation queue handed to tools and renderers: enough to
@@ -49,11 +49,21 @@ export interface SceneContextBase {
 }
 
 /**
+ * The image's media dimensions and camera calibration, for kinds that project
+ * into the 2D scene (e.g. rendering a bbox3d as a projected wireframe).
+ */
+export interface Scene2DCamera {
+  readonly imageWidth: number;
+  readonly imageHeight: number;
+  readonly calibration: CameraCalibration | null;
+}
+
+/**
  * The read-only slice of the 2D scene a **renderer** may touch: it can display
  * annotations and manage selection, but has no `mutations` and no
  * `setActiveTool`, so a renderer cannot write to the queue or switch tools. This
  * makes "renderers display, tools/editors handle input" (D4) true by
- * construction. The full `Scene2DContext` is structurally assignable to it.
+ * construction. The full `Scene2DContext` extends it (adds the write surface).
  */
 export interface Scene2DReadContext {
   readonly widgetId: string;
@@ -61,21 +71,19 @@ export interface Scene2DReadContext {
   readonly collection: AnnotationStore;
   readonly stage: Konva.Stage;
   readonly annotationLayer: Konva.Layer;
+  /** Media size + calibration, for kinds that project into the image. */
+  readonly camera: Scene2DCamera;
   getKonvaImage(): Konva.Image | null;
   requestRedraw(): void;
 }
 
 /**
  * Everything a 2D (Konva) tool handler or **editor** may touch — the read slice
- * plus the write surface (`mutations`, `setActiveTool`). The widget finishes
- * building it once its Konva stage exists, then hands the same instance to every
- * tool and editor in that widget.
+ * (`Scene2DReadContext`) plus the write surface (`mutations`, `setActiveTool`
+ * from `SceneContextBase`). The widget finishes building it once its Konva stage
+ * exists, then hands the same instance to every tool and editor in that widget.
  */
-export interface Scene2DContext extends SceneContextBase {
-  readonly stage: Konva.Stage;
-  readonly annotationLayer: Konva.Layer;
-  getKonvaImage(): Konva.Image | null;
-}
+export interface Scene2DContext extends SceneContextBase, Scene2DReadContext {}
 
 /**
  * Everything a 3D (Threlte) renderer or tool may touch. The widget builds the

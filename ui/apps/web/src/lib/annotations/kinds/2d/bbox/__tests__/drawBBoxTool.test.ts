@@ -76,6 +76,7 @@ function makeHarness(opts: { image?: Konva.Image | null } = {}) {
     },
     stage: { getPointerPosition: () => pointer } as unknown as Konva.Stage,
     annotationLayer: { add: vi.fn(), batchDraw: vi.fn() } as unknown as Konva.Layer,
+    camera: { imageWidth: 100, imageHeight: 100, calibration: null },
     getKonvaImage: () => ("image" in opts ? (opts.image ?? null) : fakeImage()),
     setActiveTool: vi.fn(),
     requestRedraw: vi.fn(),

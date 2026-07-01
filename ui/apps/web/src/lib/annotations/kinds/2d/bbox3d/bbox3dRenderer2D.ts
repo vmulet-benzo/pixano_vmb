@@ -5,20 +5,20 @@ License: CECILL-C
 -------------------------------------*/
 
 import Konva from "konva";
-import {Matrix3, Matrix4, Vector3, Vector4} from "three";
+import { Matrix3, Matrix4, Vector3, Vector4 } from "three";
 
 import type { LocalBBox3DAnnotation } from "$lib/annotations/annotationCollection.svelte.js";
+import type {
+  AnnotationRenderer2D,
+  AnnotationRenderer2DFactory,
+} from "$lib/annotations/scene/renderer.js";
+import type { Scene2DReadContext } from "$lib/annotations/scene/sceneContext.js";
 import {
   BBOX_COLOR_PERSISTED,
   getPixelFrame,
   normalizedPointToPixel,
   type PixelFrame,
-} from "$lib/annotations/tools/scene2dGeometry.js";
-import type {
-  AnnotationRenderer2D,
-  AnnotationRenderer2DFactory,
-  Scene2DContext,
-} from "$lib/annotations/tools/types2d.js";
+} from "$lib/annotations/scene/scene2dGeometry.js";
 
 /**
  * Renders the "bbox3d" kind on the Konva scene: one rect (+ optional entity
@@ -33,7 +33,7 @@ class BBox3DRenderer2D implements AnnotationRenderer2D {
   private readonly labelByBBoxId = new Map<string, Konva.Label>();
   private readonly transformer: Konva.Transformer;
 
-  constructor(private readonly ctx: Scene2DContext) {
+  constructor(private readonly ctx: Scene2DReadContext) {
     this.transformer = new Konva.Transformer({
       rotateEnabled: false,
       anchorStroke: BBOX_COLOR_PERSISTED,
@@ -207,5 +207,5 @@ class BBox3DRenderer2D implements AnnotationRenderer2D {
 
 export const bbox3dRenderer2DFactory: AnnotationRenderer2DFactory = {
   kind: "bbox3d",
-  create: (ctx: Scene2DContext) => new BBox3DRenderer2D(ctx),
+  create: (ctx: Scene2DReadContext) => new BBox3DRenderer2D(ctx),
 };

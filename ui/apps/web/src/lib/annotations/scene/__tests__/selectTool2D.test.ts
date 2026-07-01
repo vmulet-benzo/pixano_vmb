@@ -31,6 +31,7 @@ function makeContext(collection: AnnotationCollection) {
     },
     stage,
     annotationLayer: {} as Konva.Layer,
+    camera: { imageWidth: 100, imageHeight: 100, calibration: null },
     getKonvaImage: () => null,
     setActiveTool: vi.fn(),
     requestRedraw: vi.fn(),

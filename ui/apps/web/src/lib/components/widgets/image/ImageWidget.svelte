@@ -141,6 +141,13 @@ License: CECILL-C
       stage,
       annotationLayer,
       getKonvaImage: () => konvaImage,
+      // Media size + calibration, consumed by kinds that project into the image
+      // (e.g. the bbox3d projected-wireframe renderer).
+      camera: {
+        imageWidth: imgOptions.imageWidth,
+        imageHeight: imgOptions.imageHeight,
+        calibration: imgOptions.calibration,
+      },
     };
 
     renderers = RENDERER_FACTORIES_2D.map((factory) => factory.create(sceneContext!));
