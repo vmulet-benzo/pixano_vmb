@@ -231,55 +231,28 @@ WorkspaceSession.annotations  (record: all kinds, all views)
 
 ---
 
-## 6. The plugin registries (per kind)
+## 6. The annotation plugin layer (per kind)
 
-| Registry | File | Holds |
-|---|---|---|
-| `TOOLS_2D` | `tools/registry2d.ts` | `selectTool2D`, `drawBBoxTool` |
-| `RENDERER_FACTORIES_2D` | `tools/registry2d.ts` | `bboxRenderer2DFactory` |
-| `TOOLS_3D` / `DEFAULT_TOOL_3D` | `tools/registry3d.ts` | `drawBBox3DTool` |
-| `PAYLOAD_BUILDERS` | `payloadBuilders.ts` | `bbox` + `bbox3d` builders |
-| `SEED_LOADERS` | `seedLoaders.ts` | REST→local loaders per kind |
+The annotation tooling is a plugin system: per-kind **payload builders + seed
+loaders** (store), **renderers** (display), and **tools/editors** (input), each
+registered in a flat list (`PAYLOAD_BUILDERS`, `SEED_LOADERS`,
+`RENDERER_FACTORIES_2D/3D`, `TOOLS_2D/3D`) under `annotations/scene/`. A kind lives
+entirely under `annotations/kinds/<2d|3d>/<kind>/`; adding one is a folder + registry
+lines, with no widget, scene, or queue edits.
 
-A **kind module** lives under `annotations/kinds/<2d|3d>/<kind>/` and provides:
-- `<kind>PayloadBuilder` — local→REST: `resource` name, `buildCreate`, `buildUpdate`;
-- `<kind>SeedLoader` — REST→local: fetch the record's rows once and map them;
-- `<kind>Renderer2D` — display on the scene (implements `AnnotationRenderer2D`);
-- `draw<Kind>Tool` — creation input (implements `Tool2D` / `Tool3D`).
+- **Widgets are hosts** (`ImageWidget`, `PointCloudWidget`): scene setup, toolbar from
+  the registry, event delegation. They build the medium-agnostic seam (`buildSeam`)
+  and name no kind.
+- **Renderers display** (they receive a *read-only* context and cannot write);
+  **tools/editors handle input** (full context; they commit via
+  `commitNewAnnotation` / `commitGeometryEdit`). Display and input are separate
+  objects — decision **D4**.
 
-Adding a kind = create the module + register it in the 4 registries. **No widget,
-mode-union, or queue edits** (see ARCHITECTURE.md "Adding a new annotation kind").
-
-### Boundary contexts (what plugins receive)
-- **`Scene2DContext`** (`tools/types2d.ts`) — everything a 2D tool/renderer may
-  touch: `widgetId`, `buildContext` (datasetId/recordId/viewId), `collection`
-  (the view facade), `mutations` (`MutationSink`), `stage`/`annotationLayer`
-  (Konva), `getKonvaImage`, `setActiveTool`, `requestRedraw`,
-  `beginPendingAnnotation`, `findEntity`, `isEntityVisible`. **Tools/renderers
-  depend on this interface, never on `WorkspaceManager`.**
-- **3D** has no `Scene3DContext` yet (DEBT-2): `PointCloudWidget` wires the editor
-  to the manager directly. Tracked.
-
----
-
-## 7. Widgets, tools, renderers (host / input / display)
-
-- **Widgets are hosts.** `ImageWidget` (Konva stage) and `PointCloudWidget`
-  (Threlte canvas) own scene setup, layout, the toolbar, and **build the
-  `Scene2DContext`** from the manager. They must not contain kind logic or
-  `if (mode === …)` branches.
-- **Tools handle input** (`drawBBoxTool`, `selectTool2D`, the 3D `BoxEditor`):
-  pointer gestures → mutate the collection / queue mutations. A tool may draw a
-  *transient* gesture preview (the 2D rubber-band rect, the 3D preview box) in its
-  own scene layer — that ephemeral visual is **not** in the collection.
-- **Renderers display** what's in the collection (`bboxRenderer2D.sync()` reconciles
-  Konva nodes from `ctx.collection.byKind("bbox")`). A node only exists for a
-  visible annotation ⇒ no node = invisible *and* non-interactive. Renderers never
-  handle creation input (decision **D4**).
-
-> Frontier rule: **is it in the `AnnotationCollection`? → renderer. Is it ephemeral
-> gesture state? → tool.** The 2D draft enters the collection on pointer-up; the 3D
-> in-progress box lives in the `BoxEditor` until commit.
+> For the full plugin design — the `scene/` contracts (`SceneContextBase`,
+> `Scene2DReadContext` / `Scene2DContext` / `Scene3DContext`, the 2D renderer/editor
+> split, the 3D `overlay` / `session` / `hud`), the decisions, and the "add a kind"
+> recipe — see **`ARCHITECTURE_TOOLING.md`**. This section deliberately does not
+> duplicate it.
 
 ---
 
@@ -383,17 +356,18 @@ ui/apps/web/src/lib/
 │  ├─ buildPayloads.ts                       local→REST bodies + entity-create + sort
 │  ├─ payloadBuilders.ts                     PAYLOAD_BUILDERS + delete/commit/reassign helpers
 │  ├─ seedLoaders.ts                         SEED_LOADERS (REST→local)
-│  ├─ tools/
-│  │  ├─ registry2d.ts / registry3d.ts       TOOLS_*, RENDERER_FACTORIES_2D
-│  │  ├─ types2d.ts / types3d.ts             Scene2DContext, MutationSink, Tool/Renderer
-│  │  └─ scene2dGeometry.ts                  pixel↔normalized helpers, PixelFrame
+│  ├─ scene/
+│  │  ├─ registry2d.ts / registry3d.ts       TOOLS_*, RENDERER_FACTORIES_*
+│  │  ├─ sceneContext.ts                      SceneContextBase, Scene2DReadContext,
+│  │  │                                       Scene2DContext, Scene3DContext, MutationSink
+│  │  ├─ renderer.ts / tool.ts                Renderer/Editor + Tool contracts
+│  │  └─ scene2dGeometry.ts                   pixel↔normalized helpers, PixelFrame
 │  └─ kinds/<2d|3d>/<kind>/                  per-kind: payloadBuilder, seedLoader,
-│                                            renderer2D, drawTool (+ 3D: boxEditor)
+│                                            renderer, editor/tool (+ 3D: overlay/session/hud)
 └─ components/
-   ├─ widgets/image/ImageWidget.svelte       Konva host, builds Scene2DContext
-   ├─ widgets/point-cloud/PointCloudWidget…  Threlte host + toolbar + confirm overlay
-   │                          PointCloudScene, usePointCloudCamera, boxEditor
-   └─ shell/RightPanel · EntitiesPanel · SaveAnnotationForm   entity UI
+   ├─ widgets/AnnotationToolbar.svelte        shared toolbar; sceneSeam.ts (buildSeam)
+   ├─ widgets/image/ImageWidget.svelte        Konva host, builds Scene2DContext
+   └─ widgets/point-cloud/PointCloudWidget…   Threlte host; PointCloudScene, boxEditor
 ```
 
 ---
@@ -404,8 +378,8 @@ ui/apps/web/src/lib/
 |---|---|---|
 | `DatasetGateway` | `workspace/datasetGateway.ts` | `httpDatasetGateway`; consumed by loader + queue |
 | `AnnotationStore` | `annotations/annotationCollection.svelte.ts` | `AnnotationCollection`, `ViewScopedAnnotations` |
-| `MutationSink` | `tools/types2d.ts` | `MutationQueue`; consumed by tools/widgets |
-| `Scene2DContext` | `tools/types2d.ts` | built by `ImageWidget`; consumed by tools/renderers |
+| `MutationSink` | `scene/sceneContext.ts` | `MutationQueue`; consumed by tools/widgets |
+| `Scene2DContext` | `scene/sceneContext.ts` | built by `ImageWidget`; consumed by tools/editors (renderers get the read-only `Scene2DReadContext`) |
 | `PayloadBuilder` | `payloadBuilders.ts` | per-kind builders in `kinds/.../` |
 | `AnnotationSeedLoader` | `seedLoaders.ts` | per-kind seed loaders |
 | `ResourceMutation` | `annotations/types.ts` | the unit the queue flushes |

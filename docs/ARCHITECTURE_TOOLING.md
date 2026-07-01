@@ -245,6 +245,28 @@ text renderer/tool interfaces mirroring the 2D/3D ones. Everything below the sea
 `commit*` helpers, `buildSeam`, `<AnnotationToolbar>` — is reused unchanged. Per
 D10, those text interfaces are written against a real feature, not pre-declared.
 
+### Worked example: a second renderer for an existing kind (bbox3d → 2D projection)
+
+A renderer is **"kind × scene", not just "kind"**: one `bbox3d` annotation can have
+two renderers — the 3D wireframe (`BBox3DRenderer.svelte`, exists) and a projected
+2D wireframe in the image widget (to build). Because the collection is record-scoped
+and `ViewScopedAnnotations` passes record-scoped kinds through every view filter, the
+bbox3ds are *already* in the image widget's store; moving a box in 3D updates the same
+object, so the projection follows live. Adding this display touches **no tool, widget,
+or queue** — it is display-only:
+
+1. `kinds/3d/bbox3d/projectedBBox3DRenderer2D.ts` implementing `AnnotationRenderer2D`
+   (`kind: "bbox3d"`, read-only `Scene2DReadContext`). `sync()` reads
+   `ctx.collection.byKind("bbox3d")`, projects each box's 8 corners through the camera
+   calibration, and draws Konva lines via `getPixelFrame` (`scene2dGeometry.ts`).
+2. Register it in `RENDERER_FACTORIES_2D` (`scene/registry2d.ts`).
+3. One seam to extend: add a `calibration` field to `Scene2DReadContext` and populate
+   it in `ImageWidget` from `options.calibration` (already plumbed by `ImageExtension`).
+4. The projection math can be ported from the backend
+   `src/pixano/schemas/annotations/bbox.py` (`get_3dbbox_corners`, `project_points`,
+   `get_bbox2d_coords`; ~60 lines, 8 points, no numpy needed; ignore `distortion` for
+   parity). Test the pure math (pattern: `__tests__/coordinateTransforms.test.ts`).
+
 ## History — the refactor stages
 
 **Phases 0–6 (2026-06-11 design).** 0: mechanical renames (`localBBoxId` →
