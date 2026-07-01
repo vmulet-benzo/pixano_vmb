@@ -153,7 +153,7 @@ export class RecordLoader {
     // Index every claimed view by row id AND logical name (legacy rows used
     // the camera name as view_id), then run each kind's seed loader once for
     // the whole record. REST→local mapping lives in the kind modules — the
-    // loader only orchestrates (docs/ARCHITECTURE.md, seed-loader registry).
+    // loader only orchestrates (docs/ARCHITECTURE_TOOLING.md, seed-loader registry).
     const views = new Map<string, ViewInfo>();
     for (const { seed } of claimed) {
       if (!seed.view) continue;

@@ -83,7 +83,7 @@ export class BoxEditor {
       this._ringWorldQuat.multiplyQuaternions(this.previewQuaternion, RING_LOCAL_QUATS[i]);
       return {
         color: ring.color,
-        quat: [this._ringWorldQuat.x, this._ringWorldQuat.y, this._ringWorldQuat.z, this._ringWorldQuat.w],
+        quat: [this._ringWorldQuat.x, this._ringWorldQuat.y, this._ringWorldQuat.z, this._ringWorldQuat.w] as [number, number, number, number],
       };
     }),
   );

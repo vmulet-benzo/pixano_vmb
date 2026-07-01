@@ -7,47 +7,36 @@ License: CECILL-C
 import Konva from "konva";
 
 import type { LocalBBox } from "$lib/annotations/annotationCollection.svelte.js";
+import type {
+  AnnotationRenderer2D,
+  AnnotationRenderer2DFactory,
+} from "$lib/annotations/scene/renderer.js";
+import type { Scene2DReadContext } from "$lib/annotations/scene/sceneContext.js";
 import {
   BBOX_COLOR_DRAFT,
   BBOX_COLOR_PERSISTED,
   getPixelFrame,
   normalizedToPixel,
-  pixelToNormalized,
   type PixelFrame,
-} from "$lib/annotations/tools/scene2dGeometry.js";
-import type {
-  AnnotationRenderer2D,
-  AnnotationRenderer2DFactory,
-  Scene2DContext,
-} from "$lib/annotations/tools/types2d.js";
+} from "$lib/annotations/scene/scene2dGeometry.js";
 import { pickEntityLabel } from "$lib/annotations/types.js";
 
-import { bboxPayloadBuilder } from "./bboxPayloadBuilder.js";
+import { BBOX_ID_ATTR, BBOX_NODE_NAME } from "./bbox2dNodes.js";
+import { createBBoxEditor2D } from "./bboxEditor2D.js";
 
 /**
- * Renders the "bbox" kind on the Konva scene: one rect (+ optional entity
- * label) per annotation, a shared transformer for the selection, and the
- * drag/transform handlers that write geometry changes back through the
- * collection and the mutation queue.
+ * Displays the "bbox" kind on the Konva scene: one rect (+ optional entity
+ * label) per annotation, click-to-select, and label-follow while a node is
+ * dragged or transformed. It receives a read-only context and so cannot write
+ * to the queue — the drag/transform → commit path lives in `bboxEditor2D.ts` (D4).
  */
 class BBoxRenderer2D implements AnnotationRenderer2D {
   readonly kind = "bbox" as const;
 
   private readonly rectByBBoxId = new Map<string, Konva.Rect>();
   private readonly labelByBBoxId = new Map<string, Konva.Label>();
-  private readonly transformer: Konva.Transformer;
 
-  constructor(private readonly ctx: Scene2DContext) {
-    this.transformer = new Konva.Transformer({
-      rotateEnabled: false,
-      anchorStroke: BBOX_COLOR_PERSISTED,
-      anchorFill: "#0f172a",
-      borderStroke: BBOX_COLOR_PERSISTED,
-      keepRatio: false,
-      ignoreStroke: true,
-    });
-    ctx.annotationLayer.add(this.transformer);
-  }
+  constructor(private readonly ctx: Scene2DReadContext) {}
 
   sync(): void {
     const frame = getPixelFrame(this.ctx.getKonvaImage());
@@ -89,64 +78,24 @@ class BBoxRenderer2D implements AnnotationRenderer2D {
       if (!activeIds.has(id)) { label.destroy(); this.labelByBBoxId.delete(id); }
     }
 
-    this._syncTransformer();
     this.ctx.annotationLayer.batchDraw();
   }
 
   destroy(): void {
-    this.transformer.destroy();
     for (const rect of this.rectByBBoxId.values()) rect.destroy();
     this.rectByBBoxId.clear();
     for (const label of this.labelByBBoxId.values()) label.destroy();
     this.labelByBBoxId.clear();
   }
 
-  private _syncTransformer(): void {
-    const id = this.ctx.collection.selectedId;
-    const rect = id ? this.rectByBBoxId.get(id) : undefined;
-    if (rect) {
-      this.transformer.nodes([rect]);
-      this.transformer.moveToTop();
-    } else {
-      this.transformer.nodes([]);
-    }
-    this.transformer.getLayer()?.batchDraw();
-  }
-
-  private _select(id: string | null): void {
-    this.ctx.collection.select(id);
-    this._syncTransformer();
-  }
-
-  private _commitRectGeometry(bboxId: string, rect: Konva.Rect): void {
-    const frame = getPixelFrame(this.ctx.getKonvaImage());
-    if (!frame || frame.w <= 0 || frame.h <= 0) return;
-
-    const bbox = this.ctx.collection.find(bboxId);
-    if (!bbox) return;
-
-    const coordsNorm = pixelToNormalized(rect.x(), rect.y(), rect.width(), rect.height(), frame);
-    this.ctx.collection.setGeometry(bboxId, coordsNorm);
-
-    if (bbox.persisted) {
-      this.ctx.mutations.upsertUpdate({
-        op: "update",
-        resource: bboxPayloadBuilder.resource,
-        id: bbox.id,
-        body: bboxPayloadBuilder.buildUpdate(this.ctx.buildContext, bbox as LocalBBox),
-        widgetId: this.ctx.widgetId,
-        localAnnotationId: bbox.id,
-      });
-    } else {
-      this.ctx.mutations.patchPendingCreate(bbox.id, bboxPayloadBuilder.resource, {
-        coords: Array.from(coordsNorm),
-      });
-    }
-  }
-
   private _positionLabel(label: Konva.Label, rect: Konva.Rect): void {
     const { x, y } = rect.position();
     label.position({ x, y: y - label.height() - 1 });
+  }
+
+  private _followLabel(bboxId: string, rect: Konva.Rect): void {
+    const lbl = this.labelByBBoxId.get(bboxId);
+    if (lbl) this._positionLabel(lbl, rect);
   }
 
   private _makeRect(bbox: LocalBBox, frame: PixelFrame | null): Konva.Rect | null {
@@ -162,34 +111,13 @@ class BBoxRenderer2D implements AnnotationRenderer2D {
       strokeWidth: 2,
       dash: bbox.persisted ? undefined : [6, 4],
       draggable: true,
-      name: "bbox",
+      name: BBOX_NODE_NAME,
     });
-    rect.setAttr("bboxId", bbox.id);
-    rect.on("click tap", (e) => { e.cancelBubble = true; this._select(bbox.id); });
-    rect.on("dragmove", () => {
-      const lbl = this.labelByBBoxId.get(bbox.id);
-      if (lbl) this._positionLabel(lbl, rect);
-    });
-    rect.on("dragend", () => {
-      this._commitRectGeometry(bbox.id, rect);
-      const lbl = this.labelByBBoxId.get(bbox.id);
-      if (lbl) this._positionLabel(lbl, rect);
-    });
-    rect.on("transform", () => {
-      const lbl = this.labelByBBoxId.get(bbox.id);
-      if (lbl) this._positionLabel(lbl, rect);
-    });
-    rect.on("transformend", () => {
-      const sx = rect.scaleX();
-      const sy = rect.scaleY();
-      rect.width(Math.max(1, rect.width() * sx));
-      rect.height(Math.max(1, rect.height() * sy));
-      rect.scaleX(1);
-      rect.scaleY(1);
-      this._commitRectGeometry(bbox.id, rect);
-      const lbl = this.labelByBBoxId.get(bbox.id);
-      if (lbl) this._positionLabel(lbl, rect);
-    });
+    rect.setAttr(BBOX_ID_ATTR, bbox.id);
+    // Selection is display state, not a queue mutation, so it stays in the renderer.
+    rect.on("click tap", (e) => { e.cancelBubble = true; this.ctx.collection.select(bbox.id); });
+    // Keep the label glued to the box while the editor drags/transforms it.
+    rect.on("dragmove transform", () => this._followLabel(bbox.id, rect));
     return rect;
   }
 
@@ -206,5 +134,6 @@ class BBoxRenderer2D implements AnnotationRenderer2D {
 
 export const bboxRenderer2DFactory: AnnotationRenderer2DFactory = {
   kind: "bbox",
-  create: (ctx: Scene2DContext) => new BBoxRenderer2D(ctx),
+  create: (ctx: Scene2DReadContext) => new BBoxRenderer2D(ctx),
+  createEditor: createBBoxEditor2D,
 };

@@ -7,22 +7,19 @@ License: CECILL-C
 import Konva from "konva";
 import { Square } from "lucide-svelte";
 
-import type { LocalBBox } from "$lib/annotations/annotationCollection.svelte.js";
-import { generateShortId } from "$lib/annotations/buildPayloads.js";
+import { commitNewAnnotation } from "$lib/annotations/payloadBuilders.js";
 import {
   BBOX_COLOR_DRAFT,
   getPixelFrame,
   PIXEL_THRESHOLD,
   pixelToNormalized,
-} from "$lib/annotations/tools/scene2dGeometry.js";
+} from "$lib/annotations/scene/scene2dGeometry.js";
+import type { Scene2DContext } from "$lib/annotations/scene/sceneContext.js";
 import {
   DEFAULT_TOOL_2D,
-  type Scene2DContext,
   type Tool2D,
   type ToolHandler2D,
-} from "$lib/annotations/tools/types2d.js";
-
-import { bboxPayloadBuilder } from "./bboxPayloadBuilder.js";
+} from "$lib/annotations/scene/tool.js";
 
 /**
  * Rubber-band bbox drawing. Pointer down anchors a corner, move stretches
@@ -100,19 +97,7 @@ class DrawBBoxHandler implements ToolHandler2D {
 
     const coordsNorm = pixelToNormalized(clampedLeft, clampedTop, clampedW, clampedH, frame);
 
-    const bbox: LocalBBox = {
-      id: generateShortId(),
-      entityId: generateShortId(),
-      kind: "bbox",
-      viewId: this.ctx.buildContext.viewId,
-      geometry: coordsNorm,
-      persisted: false,
-    };
-    this.ctx.collection.add(bbox);
-
-    for (const m of bboxPayloadBuilder.buildCreate(this.ctx.buildContext, bbox, this.ctx.widgetId)) {
-      this.ctx.mutations.queue(m);
-    }
+    const bbox = commitNewAnnotation(this.ctx, "bbox", coordsNorm);
 
     this.ctx.setActiveTool(DEFAULT_TOOL_2D);
     this.ctx.collection.select(bbox.id);

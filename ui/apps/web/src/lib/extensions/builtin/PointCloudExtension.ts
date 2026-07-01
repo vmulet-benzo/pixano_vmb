@@ -4,7 +4,7 @@ Author : pixano@cea.fr
 License: CECILL-C
 -------------------------------------*/
 
-import { DEFAULT_TOOL_3D } from "$lib/annotations/tools/types3d.js";
+import { DEFAULT_TOOL_3D } from "$lib/annotations/scene/tool.js";
 import type { PointCloudWidgetStorage } from "$lib/annotations/types.js";
 import PointCloudWidget from "$lib/components/widgets/point-cloud/PointCloudWidget.svelte";
 

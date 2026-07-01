@@ -9,7 +9,8 @@ import { describe, expect, it, vi } from "vitest";
 
 import { AnnotationCollection, type LocalBBox } from "../../annotationCollection.svelte.js";
 import { selectTool2D } from "../selectTool2D.js";
-import { DEFAULT_TOOL_2D, type Scene2DContext } from "../types2d.js";
+import type { Scene2DContext } from "../sceneContext.js";
+import { DEFAULT_TOOL_2D } from "../tool.js";
 
 function makeBBox(id: string, persisted = true): LocalBBox {
   return { id, entityId: `e-${id}`, kind: "bbox", viewId: "view", geometry: [0.1, 0.1, 0.2, 0.2], persisted };

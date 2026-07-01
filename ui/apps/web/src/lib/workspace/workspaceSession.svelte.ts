@@ -19,7 +19,7 @@ import type { EntityRow } from "$lib/api/annotations.js";
  *
  * The annotation collection lives here because annotations are record-scoped
  * truth: every widget viewing the record reads and writes the same instance
- * (see docs/ARCHITECTURE.md, Phase 6).
+ * (see docs/ARCHITECTURE_TOOLING.md, Phase 6).
  *
  * Lives in a `.svelte.ts` file so the runes compiler picks up `$state`.
  */

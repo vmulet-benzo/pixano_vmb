@@ -4,7 +4,7 @@ Author : pixano@cea.fr
 License: CECILL-C
 -------------------------------------*/
 
-import { DEFAULT_TOOL_2D } from "$lib/annotations/tools/types2d.js";
+import { DEFAULT_TOOL_2D } from "$lib/annotations/scene/tool.js";
 import type {
   CameraCalibration,
   ImageWidgetOptions,

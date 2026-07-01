@@ -9,7 +9,7 @@ import type { CoordsNorm } from "./types.js";
 /**
  * Every annotation kind the workspace can hold. Adding a kind means adding a
  * literal here plus a module under `lib/annotations/kinds/` — see
- * docs/ARCHITECTURE.md "Adding a new annotation kind".
+ * docs/ARCHITECTURE_TOOLING.md "Adding a new annotation kind".
  */
 export type AnnotationKind = "bbox" | "bbox3d" | "mask";
 
@@ -23,7 +23,7 @@ export const RECORD_SCOPED_KINDS: ReadonlySet<AnnotationKind> = new Set(["bbox3d
 /**
  * The one local representation shared by every annotation kind. Pure data:
  * rendering, input handling and payload building live in per-kind modules,
- * never as methods here (see docs/ARCHITECTURE.md, decision D4).
+ * never as methods here (see docs/ARCHITECTURE_TOOLING.md, decision D4).
  */
 export interface LocalAnnotation<G = unknown> {
   id: string;

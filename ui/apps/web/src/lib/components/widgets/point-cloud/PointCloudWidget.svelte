@@ -5,25 +5,20 @@ License: CECILL-C
 -------------------------------------->
 
 <script lang="ts">
-  import { Eye, Globe, Move, Orbit, Save, Scaling } from "lucide-svelte";
+  import { Eye, Globe } from "lucide-svelte";
   import { getContext, onMount } from "svelte";
   import type { Component } from "svelte";
 
-  import type {
-    BBox3DGeometry,
-    LocalBBox3DAnnotation,
-  } from "$lib/annotations/annotationCollection.svelte.js";
-  import { DEFAULT_3D_ROTATION, generateShortId } from "$lib/annotations/buildPayloads.js";
-  import {
-    BBOX3D_RESOURCE,
-    bbox3dPayloadBuilder,
-  } from "$lib/annotations/kinds/3d/bbox3d/bbox3dPayloadBuilder.js";
-  import { DEFAULT_TOOL_3D, TOOLS_3D } from "$lib/annotations/tools/registry3d.js";
+  // Type-only import (erased at runtime, so the dynamic import below still
+  // code-splits) — gives the scene's exact prop types to the lazy holder.
+  import type PointCloudSceneComponent from "./PointCloudScene.svelte";
+
+  import { DEFAULT_TOOL_3D, TOOLS_3D } from "$lib/annotations/scene/registry3d.js";
   import type { PointCloudWidgetStorage } from "$lib/annotations/types.js";
-  import type { LocalBBox3D } from "$lib/api/annotations.js";
   import type { WorkspaceManager } from "$lib/workspace/workspaceManager.svelte.js";
 
-  import type { GizmoVisibility } from "$lib/annotations/kinds/3d/bbox3d/bbox3dTypes.js";
+  import AnnotationToolbar from "../AnnotationToolbar.svelte";
+  import { buildSeam } from "../sceneSeam.js";
 
   interface Props {
     widgetId: string;
@@ -45,27 +40,35 @@ License: CECILL-C
   // svelte-ignore state_referenced_locally
   const viewId = (data?.viewId as string | undefined) ?? "";
 
-  let cameraMode = $state<"orbit" | "first-person">("orbit");
+  // The medium-agnostic seam: this view's window onto the shared collection
+  // plus the mutation sink. PointCloudScene completes it into a Scene3DContext.
+  // (Threlte redraws on reactive invalidation, so no imperative redraw hook.)
+  const seam = buildSeam(manager, {
+    widgetId: stableWidgetId,
+    buildContext: { datasetId, recordId, viewId },
+    storage,
+  });
 
-  let confirmEditingId = $state<string | null>(null);
+  let cameraMode = $state<"orbit" | "first-person">("orbit");
 
   let ready = $state(false);
   let error = $state<string | null>(null);
   let CanvasComponent = $state<Component | null>(null);
-  let SceneComponent = $state<Component | null>(null);
+  let SceneComponent = $state<typeof PointCloudSceneComponent | null>(null);
   let canvasEl = $state<HTMLDivElement | null>(null);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  let sceneRef = $state<any>(null);
 
-  let confirmCoords = $state<[number, number, number, number, number, number] | null>(null);
-  let confirmRotation = $state<number[] | undefined>(undefined);
-  let gizmoVisibility = $state<GizmoVisibility>({ rings: true, resizeArrows: true, translateArrows: true });
-
-  const GIZMO_TOGGLES: { key: keyof GizmoVisibility; icon: typeof Orbit; label: string }[] = [
-    { key: "rings", icon: Orbit, label: "rotation rings" },
-    { key: "resizeArrows", icon: Scaling, label: "resize arrows" },
-    { key: "translateArrows", icon: Move, label: "translate arrows" },
-  ];
+  // Per-tool editing sessions (kind-owned confirm state + commit), created once.
+  // The widget is a courier: it never reads a session's fields — it only routes
+  // each session to the tool's scene overlay (via toolProps) and its DOM HUD.
+  const sessions: Record<string, unknown> = {};
+  const toolProps: Record<string, { session: unknown }> = {};
+  for (const tool of TOOLS_3D) {
+    if (tool.createSession) {
+      const session = tool.createSession(seam);
+      sessions[tool.id] = session;
+      toolProps[tool.id] = { session };
+    }
+  }
 
   onMount(async () => {
     try {
@@ -86,160 +89,41 @@ License: CECILL-C
     const tool = TOOLS_3D.find((t) => t.id === storage.activeToolId);
     canvasEl.style.cursor = tool?.cursor ?? "default";
   });
-
-  function handleReadyToConfirm(
-    coords: [number, number, number, number, number, number],
-    rotation?: number[],
-    editingId?: string,
-  ): void {
-    confirmEditingId = editingId ?? null;
-    confirmCoords = coords;
-    confirmRotation = rotation;
-  }
-
-  function handleDrawCanceled(): void {
-    confirmCoords = null;
-    confirmEditingId = null;
-  }
-
-  function handleConfirmSave(): void {
-    if (!confirmCoords) return;
-    const coords = confirmCoords;
-    const rotation = confirmRotation;
-    confirmCoords = null;
-
-    if (confirmEditingId) {
-      handleEditBoxSave(confirmEditingId, coords, rotation);
-      confirmEditingId = null;
-    } else {
-      handleNewBoxSave(coords, rotation);
-    }
-
-    sceneRef?.reset();
-  }
-
-  function handleEditBoxSave(
-    boxId: string,
-    coords: [number, number, number, number, number, number],
-    rotation: number[] | undefined,
-  ): void {
-    const annotation = manager.annotations.find(boxId);
-    if (!annotation) return;
-
-    const geometry: BBox3DGeometry = { coords, format: "xyzwhd", rotation };
-    manager.annotations.setGeometry(boxId, geometry);
-
-    if (annotation.persisted) {
-      manager.upsertUpdateMutation({
-        op: "update",
-        resource: BBOX3D_RESOURCE,
-        id: boxId,
-        body: bbox3dPayloadBuilder.buildUpdate({ datasetId, recordId, viewId }, annotation as LocalBBox3DAnnotation),
-        widgetId: stableWidgetId,
-        localAnnotationId: boxId,
-      });
-    } else {
-      manager.patchPendingCreateMutation(boxId, BBOX3D_RESOURCE, {
-        coords: Array.from(coords),
-        rotation: rotation ?? DEFAULT_3D_ROTATION,
-      });
-    }
-  }
-
-  function handleNewBoxSave(
-    coords: [number, number, number, number, number, number],
-    rotation: number[] | undefined,
-  ): void {
-    const draft: LocalBBox3DAnnotation = {
-      id: generateShortId(),
-      entityId: generateShortId(),
-      kind: "bbox3d",
-      viewId,
-      geometry: { coords, format: "xyzwhd", rotation },
-      persisted: false,
-    };
-    manager.annotations.add(draft);
-    for (const m of bbox3dPayloadBuilder.buildCreate({ datasetId, recordId, viewId }, draft, stableWidgetId)) {
-      manager.queueMutation(m);
-    }
-  }
-
-  function handleConfirmCancel(): void {
-    confirmCoords = null;
-    confirmEditingId = null;
-    sceneRef?.reset();
-  }
-
-  const allBboxes3d = $derived<LocalBBox3D[]>(
-    manager.annotations.byKind("bbox3d").map(
-      (a): LocalBBox3D => ({
-        id: a.id,
-        record_id: recordId,
-        entity_id: a.entityId,
-        view_id: viewId,
-        coords: a.geometry.coords,
-        format: a.geometry.format,
-        rotation: a.geometry.rotation ?? DEFAULT_3D_ROTATION,
-        is_normalized: false,
-        entity: a.entity,
-      }),
-    ),
-  );
 </script>
 
 <div class="relative flex h-full w-full flex-col bg-card">
   <!-- Toolbar -->
-  <div
-    class="flex items-center gap-0.5 border-b border-border bg-muted/30 px-1.5 py-0.5"
-    onpointerdown={(e) => e.stopPropagation()}
-    role="toolbar"
-    aria-label="Point cloud tools"
-    tabindex="0"
+  <AnnotationToolbar
+    tools={TOOLS_3D}
+    activeToolId={storage.activeToolId}
+    defaultToolId={DEFAULT_TOOL_3D}
+    onSelectTool={(id) => (storage.activeToolId = id)}
+    pendingCount={manager.pendingCount}
+    saveDisabled={manager.pendingCount === 0 || manager.saving}
+    saving={manager.saving}
+    saveError={manager.saveError}
+    onSave={() => manager.flushSave()}
+    ariaLabel="Point cloud tools"
   >
-    {#each TOOLS_3D as tool (tool.id)}
+    {#snippet controls()}
       <button
         type="button"
-        onclick={() => (storage.activeToolId = storage.activeToolId === tool.id ? DEFAULT_TOOL_3D : tool.id)}
-        title={tool.label}
-        class="rounded p-1 text-muted-foreground hover:bg-accent hover:text-accent-foreground {storage.activeToolId === tool.id ? 'bg-accent text-accent-foreground' : ''}"
+        onclick={() => (cameraMode = "orbit")}
+        title="Orbit mode (Left drag to orbit · Right drag to pan · Scroll to zoom)"
+        class="rounded p-1 text-muted-foreground hover:bg-accent hover:text-accent-foreground {cameraMode === 'orbit' ? 'bg-accent text-accent-foreground' : ''}"
       >
-        <tool.icon class="h-3.5 w-3.5" />
+        <Globe class="h-3.5 w-3.5" />
       </button>
-    {/each}
-    <div class="mx-1 h-4 w-px bg-border"></div>
-    <button
-      type="button"
-      onclick={() => (cameraMode = "orbit")}
-      title="Orbit mode (Left drag to orbit · Right drag to pan · Scroll to zoom)"
-      class="rounded p-1 text-muted-foreground hover:bg-accent hover:text-accent-foreground {cameraMode === 'orbit' ? 'bg-accent text-accent-foreground' : ''}"
-    >
-      <Globe class="h-3.5 w-3.5" />
-    </button>
-    <button
-      type="button"
-      onclick={() => (cameraMode = "first-person")}
-      title="First person mode (Left drag to pan · Right drag to look around · Scroll to move forward/back)"
-      class="rounded p-1 text-muted-foreground hover:bg-accent hover:text-accent-foreground {cameraMode === 'first-person' ? 'bg-accent text-accent-foreground' : ''}"
-    >
-      <Eye class="h-3.5 w-3.5" />
-    </button>
-    <div class="mx-1 h-4 w-px bg-border"></div>
-    <button
-      type="button"
-      onclick={() => manager.flushSave()}
-      disabled={manager.pendingCount === 0 || manager.saving}
-      title="Save annotations"
-      class="rounded p-1 text-muted-foreground hover:bg-accent hover:text-accent-foreground disabled:cursor-not-allowed disabled:opacity-40"
-    >
-      <Save class="h-3.5 w-3.5" />
-    </button>
-    {#if manager.pendingCount > 0}
-      <span class="ml-1 text-[10px] text-muted-foreground">{manager.pendingCount} unsaved</span>
-    {/if}
-    {#if manager.saveError}
-      <span class="ml-1 max-w-[200px] truncate text-[10px] text-destructive" title={manager.saveError}>Save failed</span>
-    {/if}
-  </div>
+      <button
+        type="button"
+        onclick={() => (cameraMode = "first-person")}
+        title="First person mode (Left drag to pan · Right drag to look around · Scroll to move forward/back)"
+        class="rounded p-1 text-muted-foreground hover:bg-accent hover:text-accent-foreground {cameraMode === 'first-person' ? 'bg-accent text-accent-foreground' : ''}"
+      >
+        <Eye class="h-3.5 w-3.5" />
+      </button>
+    {/snippet}
+  </AnnotationToolbar>
 
   <!-- 3D canvas area -->
   {#if error}
@@ -254,52 +138,26 @@ License: CECILL-C
       <div class="absolute inset-0">
         <CanvasComponent>
           <SceneComponent
-            bind:this={sceneRef}
             pointCloudUrl={data?.pointCloudUrl as string | undefined}
-            bboxes3d={allBboxes3d}
+            {seam}
             activeToolId={storage.activeToolId}
             {cameraMode}
-            onReadyToConfirm={handleReadyToConfirm}
-            onDrawCanceled={handleDrawCanceled}
             onLoadError={(msg: string) => (error = msg)}
-            {gizmoVisibility}
+            {toolProps}
           />
         </CanvasComponent>
       </div>
 
-      <!-- Confirm overlay -->
-      {#if confirmCoords}
-        <div class="pointer-events-none absolute inset-x-0 bottom-4 flex justify-center">
-          <div class="pointer-events-auto flex items-center gap-2 rounded-lg border border-border bg-background/95 px-3 py-2 text-sm shadow-lg backdrop-blur-sm">
-            <span class="text-muted-foreground">Save this 3D box?</span>
-            <button
-              type="button"
-              onclick={handleConfirmSave}
-              class="rounded bg-primary px-2.5 py-1 text-xs font-medium text-primary-foreground hover:bg-primary/90"
-            >
-              Save
-            </button>
-            <button
-              type="button"
-              onclick={handleConfirmCancel}
-              class="rounded border border-border px-2.5 py-1 text-xs hover:bg-accent"
-            >
-              Cancel
-            </button>
-            <div class="mx-1 h-4 w-px bg-border"></div>
-            {#each GIZMO_TOGGLES as toggle (toggle.key)}
-              <button
-                type="button"
-                onclick={() => (gizmoVisibility = { ...gizmoVisibility, [toggle.key]: !gizmoVisibility[toggle.key] })}
-                title={gizmoVisibility[toggle.key] ? `Hide ${toggle.label}` : `Show ${toggle.label}`}
-                class="rounded p-1 text-muted-foreground hover:bg-accent hover:text-accent-foreground {gizmoVisibility[toggle.key] ? 'bg-accent text-accent-foreground' : ''}"
-              >
-                <toggle.icon class="h-3.5 w-3.5" />
-              </button>
-            {/each}
-          </div>
-        </div>
-      {/if}
+      <!-- Active tool's DOM HUD (e.g. the bbox3d confirm panel), owned by the
+           kind. The widget mounts it but names no kind. -->
+      {#each TOOLS_3D as tool (tool.id)}
+        <!-- A HUD only renders for the active tool that also provided a session
+             (a `hud` without a `createSession` would otherwise crash — DEBT-6). -->
+        {#if tool.hud && tool.id === storage.activeToolId && sessions[tool.id]}
+          {@const Hud = tool.hud}
+          <Hud session={sessions[tool.id]} />
+        {/if}
+      {/each}
     </div>
   {:else}
     <div class="flex flex-1 items-center justify-center">

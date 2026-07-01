@@ -7,7 +7,8 @@ License: CECILL-C
 import { MousePointer2 } from "lucide-svelte";
 
 import { deleteLocalAnnotation } from "../payloadBuilders.js";
-import { DEFAULT_TOOL_2D, type Scene2DContext, type Tool2D, type ToolHandler2D } from "./types2d.js";
+import type { Scene2DContext } from "./sceneContext.js";
+import { DEFAULT_TOOL_2D, type Tool2D, type ToolHandler2D } from "./tool.js";
 
 /**
  * Default 2D tool: click an annotation to select it (the renderer's nodes

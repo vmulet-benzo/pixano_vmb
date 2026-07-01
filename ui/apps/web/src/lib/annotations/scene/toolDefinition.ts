@@ -10,8 +10,8 @@ import type { ComponentType, SvelteComponent } from "svelte";
 import type { AnnotationKind } from "../annotationCollection.svelte.js";
 
 /**
- * Metadata shared by every tool, 2D or 3D. This is the only type the two
- * scene families have in common (docs/ARCHITECTURE.md, decision D3).
+ * Metadata shared by every tool, 2D or 3D — the tool-level type the two scene
+ * families have in common (docs/ARCHITECTURE_TOOLING.md, decision D3).
  */
 export interface ToolDefinition {
   /** Unique id, e.g. "select", "draw-bbox". */

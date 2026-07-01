@@ -51,7 +51,7 @@ import { AnnotationCollection, type BBoxGeometry } from "$lib/annotations/annota
 import type { CoordsNorm } from "$lib/annotations/types.js";
 
 import { drawBBoxTool } from "../drawBBoxTool.js";
-import type { Scene2DContext } from "$lib/annotations/tools/types2d.js";
+import type { Scene2DContext } from "$lib/annotations/scene/sceneContext.js";
 
 // ─── Harness ─────────────────────────────────────────────────────────────────
 
