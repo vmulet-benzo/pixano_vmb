@@ -1,6 +1,6 @@
 # Coding Standards — `ui/apps/web`
 
-> Companion to [ARCHITECTURE.md](./ARCHITECTURE.md). These standards apply to the
+> Companion to [ARCHITECTURE_TOOLING.md](./ARCHITECTURE_TOOLING.md). These standards apply to the
 > next-UI workspace app and especially to annotation tooling code.
 
 ## Architecture rules
@@ -55,5 +55,5 @@
 
 - Branch from `frontend/next-ui-init`; conventional commit messages; atomic
   commits; self-review before each commit.
-- Refactoring phases (see ARCHITECTURE.md migration plan) land as separate PRs;
+- Refactoring phases (see ARCHITECTURE_TOOLING.md migration plan) land as separate PRs;
   never mix a phase with feature work.

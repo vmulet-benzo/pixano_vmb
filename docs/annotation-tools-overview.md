@@ -1,6 +1,6 @@
 # Annotation tooling — how the pieces fit (`ui/apps/web`)
 
-> Companion to [ARCHITECTURE.md](./ARCHITECTURE.md). Written for anyone adding
+> Companion to [ARCHITECTURE_TOOLING.md](./ARCHITECTURE_TOOLING.md). Written for anyone adding
 > an annotation feature — the worked example at the end is **projecting 3D
 > boxes onto the image widget**.
 
@@ -77,7 +77,7 @@ service inside the Threlte scene, because that's where the camera lives.
 | Shared 2D pixel↔normalized helpers | `lib/annotations/tools/scene2dGeometry.ts` |
 | 3D Lance↔Three.js transforms | `lib/annotations/coordinateTransforms.ts` |
 
-Full recipe: ARCHITECTURE.md → "Adding a new annotation kind".
+Full recipe: ARCHITECTURE_TOOLING.md → "Adding a new annotation kind".
 
 ## Worked example: projecting 3D boxes onto the image widget
 

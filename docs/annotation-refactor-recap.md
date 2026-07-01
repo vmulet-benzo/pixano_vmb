@@ -6,7 +6,7 @@
 unchanged from baseline (43 pre-existing errors, **0 added**); production build OK.
 **Status:** local branch, not yet pushed/merged.
 
-Companion docs: [`ARCHITECTURE.md`](./ARCHITECTURE.md) (the agreed design + decisions
+Companion docs: [`ARCHITECTURE_TOOLING.md`](./ARCHITECTURE_TOOLING.md) (the agreed design + decisions
 D1–D6 + "Known debts"), [`annotation-tools-overview.md`](./annotation-tools-overview.md)
 (diagram + the "add a kind" recipe), [`CODING_STANDARDS.md`](./CODING_STANDARDS.md).
 
@@ -149,7 +149,7 @@ handler factory is intentionally deferred until a 2nd 3D kind needs to share the
 ## 5. How it was delivered (commit-by-commit)
 
 Each commit ships independently with tests green. Phases map to the migration plan in
-`ARCHITECTURE.md`.
+`ARCHITECTURE_TOOLING.md`.
 
 | Commit | What |
 |---|---|
@@ -198,7 +198,7 @@ The branch then went through **three review rounds**. Notable findings fixed:
 
 ---
 
-## 7. Known debts (tracked in `ARCHITECTURE.md`) — read before extending
+## 7. Known debts (tracked in `ARCHITECTURE_TOOLING.md`) — read before extending
 
 These are **accepted weaker designs with a recorded fix-later** — not oversights:
 
