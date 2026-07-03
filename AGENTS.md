@@ -126,24 +126,24 @@ gh run watch
 
 ## Pre-commit Hooks
 
-The repository uses pre-commit for code quality. Install hooks with:
+The repository uses pre-commit for code quality. `pre-commit` is not a project dependency, so install and run it locally as a `uv` tool:
 
 ```bash
-uv run pre-commit install --install-hooks
-uv run pre-commit run install-bin -a -v
+uv tool install pre-commit
+uv tool run pre-commit install --install-hooks
 ```
 
 Run pre-commit manually:
 
 ```bash
 # Run on all files
-uv run pre-commit run --all-files
+uv tool run pre-commit run --all-files
 
 # Run on specific files
-uv run pre-commit run --files path/to/file.py
+uv tool run pre-commit run --files path/to/file.py
 
 # Run a specific hook
-uv run pre-commit run ruff --all-files
+uv tool run pre-commit run ruff --all-files
 ```
 
-This runs Ruff, typos checker, and other tools automatically before commits.
+This runs Ruff, formatting, license-header, and other configured hooks automatically before commits. Some hooks can rewrite tracked files; inspect `git status --short` after running them.
