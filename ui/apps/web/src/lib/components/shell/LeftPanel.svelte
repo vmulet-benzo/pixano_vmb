@@ -47,6 +47,8 @@ License: CECILL-C
   const TILE_SATURATION = 55;
   const TILE_LIGHTNESS = 45;
   const HUE_RANGE = 360;
+  // Odd prime multiplier for the record-id string hash (classic 31·h + c).
+  const HASH_PRIME = 31;
 
   // Preview URLs whose <img> failed to load (missing/empty preview blob, 404…).
   // Excluded from the collage so a broken thumbnail falls back to the remaining
@@ -74,7 +76,7 @@ License: CECILL-C
   function recordHue(id: string): number {
     let hash = 0;
     for (let i = 0; i < id.length; i++) {
-      hash = (hash * 31 + id.charCodeAt(i)) | 0;
+      hash = (hash * HASH_PRIME + id.charCodeAt(i)) | 0;
     }
     return Math.abs(hash) % HUE_RANGE;
   }
@@ -125,6 +127,9 @@ License: CECILL-C
     selectedDataset = dataset;
     explorerView = "records";
     records = [];
+    // New dataset → drop any preview failures recorded for the previous one so
+    // the set can't grow across a session or exclude an unrelated URL.
+    failedPreviewUrls = new Set();
     recordsOffset = 0;
     recordsTotal = 0;
     loading = true;
