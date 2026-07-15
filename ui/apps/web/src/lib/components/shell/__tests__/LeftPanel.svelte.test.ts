@@ -7,18 +7,17 @@ License: CECILL-C
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/svelte";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { DatasetInfo } from "$lib/types/dataset";
-import type { WidgetRegistry } from "$lib/extensions/WidgetRegistry.js";
-import type { WorkspaceManager } from "$lib/workspace/workspaceManager.svelte.js";
 import LeftPanel from "../LeftPanel.svelte";
+import { listDatasets, listRecords } from "$lib/api/datasets";
+import type { WidgetRegistry } from "$lib/extensions/WidgetRegistry.js";
+import { DatasetInfo } from "$lib/types/dataset";
+import type { WorkspaceManager } from "$lib/workspace/workspaceManager.svelte.js";
 
 vi.mock("$lib/api/datasets", () => ({
   listDatasets: vi.fn(),
   listRecords: vi.fn(),
   getDataset: vi.fn(),
 }));
-
-import { listDatasets, listRecords } from "$lib/api/datasets";
 
 const mockedListDatasets = vi.mocked(listDatasets);
 const mockedListRecords = vi.mocked(listRecords);
@@ -156,6 +155,72 @@ describe("LeftPanel — explorer section", () => {
     expect(screen.getByText("rec-2")).toBeInTheDocument();
   });
 
+  it("renders image previews for records that have them, and a fallback tile otherwise", async () => {
+    mockedListDatasets.mockResolvedValue([mockDataset]);
+    mockedListRecords.mockResolvedValue({
+      items: [
+        {
+          id: "with-previews",
+          split: "train",
+          view_previews: {
+            cam_front: { resource: "images", id: "v1", kind: "image", preview_url: "/p/v1" },
+            cam_back: { resource: "images", id: "v2", kind: "image", preview_url: "/p/v2" },
+          },
+        },
+        { id: "no-previews", split: "val" },
+      ],
+      total: 2,
+      limit: 50,
+      offset: 0,
+    });
+    const { container } = renderPanel();
+
+    await waitFor(() => screen.getByRole("button", { name: /COCO 2017/ }));
+    fireEvent.click(screen.getByRole("button", { name: /COCO 2017/ }));
+
+    await waitFor(() => screen.getByText("with-previews"));
+    const imgs = container.querySelectorAll<HTMLImageElement>("img");
+    const sources = Array.from(imgs).map((img) => img.getAttribute("src"));
+    // The two image views of the first record are rendered; the preview-less
+    // record contributes no <img> (it uses the color tile instead).
+    expect(sources).toEqual(["/p/v1", "/p/v2"]);
+    expect(imgs[0].getAttribute("loading")).toBe("lazy");
+  });
+
+  it("drops a preview whose image fails to load, keeping the others", async () => {
+    mockedListDatasets.mockResolvedValue([mockDataset]);
+    mockedListRecords.mockResolvedValue({
+      items: [
+        {
+          id: "with-previews",
+          split: "train",
+          view_previews: {
+            cam_front: { resource: "images", id: "v1", kind: "image", preview_url: "/p/v1" },
+            cam_back: { resource: "images", id: "v2", kind: "image", preview_url: "/p/v2" },
+          },
+        },
+      ],
+      total: 1,
+      limit: 50,
+      offset: 0,
+    });
+    const { container } = renderPanel();
+
+    await waitFor(() => screen.getByRole("button", { name: /COCO 2017/ }));
+    fireEvent.click(screen.getByRole("button", { name: /COCO 2017/ }));
+
+    await waitFor(() => expect(container.querySelectorAll("img")).toHaveLength(2));
+    const broken = container.querySelector<HTMLImageElement>('img[src="/p/v1"]')!;
+    fireEvent.error(broken);
+
+    await waitFor(() => {
+      const remaining = Array.from(container.querySelectorAll<HTMLImageElement>("img")).map((img) =>
+        img.getAttribute("src"),
+      );
+      expect(remaining).toEqual(["/p/v2"]);
+    });
+  });
+
   it("shows 'No records found' when dataset has no records", async () => {
     mockedListDatasets.mockResolvedValue([mockDataset]);
     mockedListRecords.mockResolvedValue({ items: [], total: 0, limit: 50, offset: 0 });
@@ -175,9 +240,7 @@ describe("LeftPanel — explorer section", () => {
     await waitFor(() => screen.getByRole("button", { name: /COCO 2017/ }));
     fireEvent.click(screen.getByRole("button", { name: /COCO 2017/ }));
 
-    await waitFor(() =>
-      expect(screen.getByText("Failed to fetch records")).toBeInTheDocument(),
-    );
+    await waitFor(() => expect(screen.getByText("Failed to fetch records")).toBeInTheDocument());
   });
 
   it("back button returns to datasets list", async () => {
@@ -203,8 +266,8 @@ describe("LeftPanel — explorer section", () => {
     await waitFor(() => screen.getByRole("button", { name: /COCO 2017/ }));
     fireEvent.click(screen.getByRole("button", { name: /COCO 2017/ }));
 
-    await waitFor(() => screen.getByRole("button", { name: "rec-1" }));
-    fireEvent.click(screen.getByRole("button", { name: "rec-1" }));
+    await waitFor(() => screen.getByRole("button", { name: "rec-1 train" }));
+    fireEvent.click(screen.getByRole("button", { name: "rec-1 train" }));
 
     await waitFor(() =>
       expect(mockManager.selectRecordInDataset).toHaveBeenCalledWith(
@@ -246,7 +309,7 @@ describe("LeftPanel — explorer section", () => {
       renderPanel();
       await waitFor(() => screen.getByRole("button", { name: /COCO 2017/ }));
       fireEvent.click(screen.getByRole("button", { name: /COCO 2017/ }));
-      await waitFor(() => screen.getByRole("button", { name: "rec-0" }));
+      await waitFor(() => screen.getByRole("button", { name: "rec-0 train" }));
     }
 
     it("requests first page with limit=50 and offset=0", async () => {
@@ -275,7 +338,7 @@ describe("LeftPanel — explorer section", () => {
       await waitFor(() => screen.getByRole("button", { name: /COCO 2017/ }));
       fireEvent.click(screen.getByRole("button", { name: /COCO 2017/ }));
 
-      await waitFor(() => screen.getByRole("button", { name: "only-rec" }));
+      await waitFor(() => screen.getByRole("button", { name: "only-rec train" }));
       expect(screen.queryByRole("button", { name: /Load more/ })).not.toBeInTheDocument();
       expect(screen.getByText("1 / 1")).toBeInTheDocument();
     });
@@ -289,7 +352,7 @@ describe("LeftPanel — explorer section", () => {
 
       await waitFor(() => expect(screen.getByText("100 / 120")).toBeInTheDocument());
       expect(mockedListRecords).toHaveBeenNthCalledWith(2, "ds-1", 50, 50);
-      expect(screen.getByRole("button", { name: "rec-99" })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "rec-99 train" })).toBeInTheDocument();
     });
 
     it("hides Load more after the final page is fetched", async () => {
@@ -344,9 +407,7 @@ describe("LeftPanel — explorer section", () => {
         await waitFor(() => expect(observeSpy).toHaveBeenCalled());
 
         const fakeEntry = { isIntersecting: true } as IntersectionObserverEntry;
-        callbacks.forEach((cb) =>
-          cb([fakeEntry], {} as IntersectionObserver),
-        );
+        callbacks.forEach((cb) => cb([fakeEntry], {} as IntersectionObserver));
 
         await waitFor(() => expect(screen.getByText("100 / 120")).toBeInTheDocument());
         expect(mockedListRecords).toHaveBeenNthCalledWith(2, "ds-1", 50, 50);
