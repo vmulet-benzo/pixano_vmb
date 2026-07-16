@@ -221,6 +221,40 @@ describe("LeftPanel — explorer section", () => {
     });
   });
 
+  // The collage cell is a fixed 2x2 grid; previewSlotClass must fill it for any
+  // view count so 2- and 3-preview records (which we can't reproduce with a real
+  // fixture here) don't leave a gap.
+  it.each([
+    [1, ["col-span-2 row-span-2"]],
+    [2, ["row-span-2", "row-span-2"]],
+    [3, ["", "", "col-span-2"]],
+    [4, ["", "", "", ""]],
+  ])("lays out %i previews so the collage cell is fully filled", async (count, expectedSpans) => {
+    const view_previews = Object.fromEntries(
+      Array.from({ length: count }, (_, i) => [
+        `cam_${i}`,
+        { resource: "images", id: `v${i}`, kind: "image", preview_url: `/p/v${i}` },
+      ]),
+    );
+    mockedListDatasets.mockResolvedValue([mockDataset]);
+    mockedListRecords.mockResolvedValue({
+      items: [{ id: "rec", split: "train", view_previews }],
+      total: 1,
+      limit: 50,
+      offset: 0,
+    });
+    const { container } = renderPanel();
+
+    await waitFor(() => screen.getByRole("button", { name: /COCO 2017/ }));
+    fireEvent.click(screen.getByRole("button", { name: /COCO 2017/ }));
+
+    await waitFor(() => expect(container.querySelectorAll("img")).toHaveLength(count));
+    const spans = Array.from(container.querySelectorAll<HTMLImageElement>("img")).map((img) =>
+      ["col-span-2", "row-span-2"].filter((c) => img.classList.contains(c)).join(" "),
+    );
+    expect(spans).toEqual(expectedSpans);
+  });
+
   it("shows 'No records found' when dataset has no records", async () => {
     mockedListDatasets.mockResolvedValue([mockDataset]);
     mockedListRecords.mockResolvedValue({ items: [], total: 0, limit: 50, offset: 0 });
